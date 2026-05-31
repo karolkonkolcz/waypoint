@@ -9,6 +9,7 @@ import {
   ChevronRightIcon,
   CalendarIcon,
   GaugeIcon,
+  MapIcon,
 } from 'lucide-react';
 import { trailRepo } from '@/lib/db/repositories/trail.repo';
 import { stageRepo } from '@/lib/db/repositories/stage.repo';
@@ -52,6 +53,13 @@ export default function TrailPage() {
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-xl font-bold">{trail.name}</h1>
         </div>
+        <Link
+          href={`/trails/${trailId}/map`}
+          className="flex h-9 items-center gap-1.5 rounded-full border px-3 text-sm font-medium hover:bg-muted"
+        >
+          <MapIcon className="h-4 w-4" />
+          Map
+        </Link>
       </div>
 
       {/* Trail stats */}

@@ -26,6 +26,15 @@ export const routeRepo = {
       .first();
   },
 
+  /** All non-deleted routes for a trail (per-stage + any legacy trail-level). */
+  async findAllByTrail(trailId: string): Promise<RouteRow[]> {
+    return db.routes
+      .where('trail_id')
+      .equals(trailId)
+      .filter((r) => r.deleted_at === null)
+      .toArray();
+  },
+
   async upsert(input: CreateRouteInput): Promise<RouteRow> {
     const now = nowIso();
     const stageId = input.stage_id ?? null;

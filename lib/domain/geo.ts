@@ -4,6 +4,9 @@ export interface GeoJSONLineString {
   coordinates: ([number, number] | [number, number, number])[];
 }
 
+/** Bounding box as [west, south, east, north] (lon/lat degrees). */
+export type BBox = [number, number, number, number];
+
 const EARTH_RADIUS_KM = 6371;
 
 function toRad(deg: number): number {
@@ -114,4 +117,36 @@ export function samplePoints(
     points.push(pointAtDistance(line, (i / (n - 1)) * total));
   }
   return points;
+}
+
+/**
+ * Bounding box of a LineString as [west, south, east, north].
+ * Elevation (third coordinate slot) is ignored. Assumes ≥1 coordinate.
+ */
+export function bboxOf(line: GeoJSONLineString): BBox {
+  let west = Infinity;
+  let south = Infinity;
+  let east = -Infinity;
+  let north = -Infinity;
+  for (const [lon, lat] of line.coordinates) {
+    if (lon < west) west = lon;
+    if (lon > east) east = lon;
+    if (lat < south) south = lat;
+    if (lat > north) north = lat;
+  }
+  return [west, south, east, north];
+}
+
+/** Union of several bounding boxes. Returns null for an empty list. */
+export function mergeBboxes(boxes: BBox[]): BBox | null {
+  if (boxes.length === 0) return null;
+  let [west, south, east, north] = boxes[0];
+  for (let i = 1; i < boxes.length; i++) {
+    const b = boxes[i];
+    if (b[0] < west) west = b[0];
+    if (b[1] < south) south = b[1];
+    if (b[2] > east) east = b[2];
+    if (b[3] > north) north = b[3];
+  }
+  return [west, south, east, north];
 }
