@@ -13,18 +13,25 @@ function setLastPulledAt(iso: string): void {
   localStorage.setItem(LAST_PULLED_KEY, iso);
 }
 
-// Explicit table map so TypeScript stays happy and the code stays readable
+// Explicit table map so TypeScript stays happy and the code stays readable.
+// weather is excluded — it is derived cache with _dirty=0 and is never pushed.
 const dexieTables = {
   trails: () => db.trails,
   routes: () => db.routes,
   stages: () => db.stages,
   waypoints: () => db.waypoints,
-  weather_cache: () => db.weather,
 } as const;
 
 type SyncableEntity = keyof typeof dexieTables;
 
-const SYNCABLE: SyncableEntity[] = ['trails', 'routes', 'stages', 'waypoints', 'weather_cache'];
+const SYNCABLE: SyncableEntity[] = ['trails', 'routes', 'stages', 'waypoints'];
+
+/** Strip Dexie-internal fields before sending to Supabase. */
+function toSupabaseRow(row: Record<string, unknown>): Record<string, unknown> {
+  const { _dirty, ...rest } = row;
+  void _dirty;
+  return rest;
+}
 
 // ---------------------------------------------------------------------------
 // Push — flush dirty rows from syncQueue to Supabase
@@ -45,7 +52,9 @@ export async function push(): Promise<void> {
         await db.syncQueue.delete(op.seq!);
         continue;
       }
-      const { error } = await supabase.from(entity).upsert(row as never, { onConflict: 'id' });
+      const { error } = await supabase
+        .from(entity)
+        .upsert(toSupabaseRow(row as unknown as Record<string, unknown>) as never, { onConflict: 'id' });
       if (error) {
         console.error(`[sync] push upsert ${entity}/${op.row_id}:`, error.message);
         continue;

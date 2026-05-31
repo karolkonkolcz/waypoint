@@ -1,9 +1,11 @@
 import Link from 'next/link';
-import { MapIcon, ListIcon, SettingsIcon } from 'lucide-react';
+import { ListIcon, SettingsIcon } from 'lucide-react';
+import { SyncProvider } from '@/components/sync/SyncProvider';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col min-h-screen">
+      <SyncProvider />
       <main className="flex-1 pb-20">{children}</main>
 
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
