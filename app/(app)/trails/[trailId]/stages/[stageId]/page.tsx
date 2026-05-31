@@ -19,8 +19,19 @@ import { StageStats } from '@/components/stage/StageStats';
 import { DifficultyBadge } from '@/components/difficulty/DifficultyBadge';
 import type { DifficultyClass } from '@/lib/domain/difficulty';
 import { naismithHours } from '@/lib/domain/eta';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/db/dexie';
+import dynamic from 'next/dynamic';
+import type { MapRoute } from '@/components/map/MapView';
+import { DIFFICULTY_LINE_COLOR, DEFAULT_LINE_COLOR } from '@/components/map/colors';
+import { alertsRepo } from '@/lib/db/repositories/alerts.repo';
+import { WeatherAlertBadge } from '@/components/weather/WeatherAlertBadge';
+
+// MapLibre is browser-only and heavy — code-split it (§11).
+const MapView = dynamic(() => import('@/components/map/MapView').then((m) => m.MapView), {
+  ssr: false,
+  loading: () => <div className="h-56 w-full animate-pulse bg-muted" />,
+});
 
 export default function StagePage() {
   const { trailId, stageId } = useParams<{ trailId: string; stageId: string }>();
@@ -30,6 +41,7 @@ export default function StagePage() {
   const allStages = useLiveQuery(() => stageRepo.findByTrail(trailId), [trailId]);
   const route = useLiveQuery(() => routeRepo.findByStage(stageId), [stageId]);
   const cachedWeather = useLiveQuery(() => weatherRepo.findByStage(stageId), [stageId]);
+  const cachedAlerts = useLiveQuery(() => alertsRepo.findByTrail(trailId), [trailId]);
 
   const [fetchingWeather, setFetchingWeather] = useState(false);
 
@@ -80,6 +92,31 @@ export default function StagePage() {
     allStages,
     cachedWeather?.fetched_at,
   ]);
+
+  // MeteoAlarm warnings for the country the stage runs through (country-level).
+  useEffect(() => {
+    if (!trail || !route) return;
+    if (cachedAlerts && alertsRepo.isFresh(cachedAlerts)) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+
+    const midKm = route.total_distance_km / 2;
+    const [lon, lat] = pointAtDistance(route.geojson, midKm);
+
+    fetch(`/api/alerts?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data) return alertsRepo.save(trailId, data.country, data.alerts);
+      })
+      .catch(() => {});
+  }, [trailId, trail?.id, route?.id, route?.total_distance_km, cachedAlerts?.fetched_at]);
+
+  const stageMapRoutes: MapRoute[] = useMemo(() => {
+    if (!route) return [];
+    const color = stage?.difficulty_class
+      ? DIFFICULTY_LINE_COLOR[stage.difficulty_class as DifficultyClass]
+      : DEFAULT_LINE_COLOR;
+    return [{ id: route.id, geojson: route.geojson, color }];
+  }, [route, stage?.difficulty_class]);
 
   const [editing, setEditing] = useState(false);
 
@@ -161,6 +198,34 @@ export default function StagePage() {
           </h2>
           <ElevationChart profile={stageProfile} />
         </section>
+      )}
+
+      {/* Route map */}
+      {stageMapRoutes.length > 0 && (
+        <section className="mb-6 overflow-hidden rounded-2xl border bg-card">
+          <div className="flex items-center justify-between px-4 pt-3 pb-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Map
+            </h2>
+            <Link
+              href={`/trails/${trailId}/map`}
+              className="text-xs text-primary hover:underline"
+            >
+              Full map
+            </Link>
+          </div>
+          <MapView routes={stageMapRoutes} className="h-56 w-full" />
+        </section>
+      )}
+
+      {/* Weather warnings (MeteoAlarm) */}
+      {cachedAlerts && cachedAlerts.alerts.length > 0 && (
+        <div className="mb-6">
+          <WeatherAlertBadge
+            alerts={cachedAlerts.alerts}
+            stale={!alertsRepo.isFresh(cachedAlerts)}
+          />
+        </div>
       )}
 
       {/* Weather forecast */}

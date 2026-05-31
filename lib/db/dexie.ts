@@ -1,5 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import type { GeoJSONLineString } from '@/lib/domain/geo';
+import type { WeatherAlert } from '@/lib/alerts/meteoalarm';
 
 type Sync = {
   created_at: string;
@@ -74,6 +75,15 @@ export interface WeatherRow extends Sync {
   fetched_at: string;
 }
 
+// Derived cache (not synced to Supabase). One row per trail — MeteoAlarm
+// warnings are country-level, so the whole trail shares them.
+export interface AlertCacheRow {
+  trail_id: string; // primary key
+  country: string | null;
+  alerts: WeatherAlert[];
+  fetched_at: string;
+}
+
 export interface SyncOp {
   seq?: number;
   entity: string;
@@ -88,6 +98,7 @@ class WaypointDB extends Dexie {
   stages!: Table<StageRow, string>;
   waypoints!: Table<WaypointRow, string>;
   weather!: Table<WeatherRow, string>;
+  alerts!: Table<AlertCacheRow, string>;
   syncQueue!: Table<SyncOp, number>;
 
   constructor() {
@@ -114,6 +125,11 @@ class WaypointDB extends Dexie {
             if (r.stage_id === undefined) r.stage_id = null;
           }),
       );
+
+    // v3: MeteoAlarm warnings cache (F5), keyed by trail_id.
+    this.version(3).stores({
+      alerts: 'trail_id, fetched_at',
+    });
   }
 }
 
