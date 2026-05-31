@@ -6,11 +6,21 @@ import { ArrowLeftIcon } from 'lucide-react';
 import Link from 'next/link';
 import { trailRepo } from '@/lib/db/repositories/trail.repo';
 import { createClient } from '@/lib/supabase/client';
+import { cn } from '@/lib/utils';
+
+const PACE_PRESETS = [
+  { label: 'Leisurely', kmh: 3, hint: 'Heavy pack or rough terrain' },
+  { label: 'Moderate', kmh: 4, hint: 'Typical hiking pace' },
+  { label: 'Fast', kmh: 5, hint: 'Light pack, experienced hiker' },
+] as const;
+
+type PaceKmh = (typeof PACE_PRESETS)[number]['kmh'];
 
 export default function NewTrailPage() {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pace, setPace] = useState<PaceKmh>(4);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -21,7 +31,6 @@ export default function NewTrailPage() {
     const name = (fd.get('name') as string).trim();
     const description = (fd.get('description') as string).trim() || null;
     const start_date = (fd.get('start_date') as string) || null;
-    const default_pace_kmh = parseFloat(fd.get('pace') as string) || 4.0;
 
     try {
       const { data } = await createClient().auth.getUser();
@@ -32,7 +41,7 @@ export default function NewTrailPage() {
         name,
         description,
         start_date,
-        default_pace_kmh,
+        default_pace_kmh: pace,
         preferences: {},
       });
 
@@ -46,6 +55,7 @@ export default function NewTrailPage() {
 
   return (
     <div className="mx-auto max-w-lg px-4 pt-4">
+      {/* Header */}
       <div className="mb-6 flex items-center gap-3">
         <Link
           href="/"
@@ -56,52 +66,82 @@ export default function NewTrailPage() {
         <h1 className="text-xl font-bold">New Trail</h1>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Name */}
         <Field label="Trail name" required>
           <input
             name="name"
             type="text"
             required
+            autoFocus
             placeholder="e.g. Pacific Crest Trail"
+            maxLength={200}
             className="input"
           />
         </Field>
 
+        {/* Description */}
         <Field label="Description">
           <textarea
             name="description"
             rows={3}
             placeholder="A short description of your hike…"
+            maxLength={1000}
             className="input resize-none"
           />
         </Field>
 
-        <Field label="Start date">
+        {/* Start date */}
+        <Field
+          label="Start date"
+          hint="Used for weather forecasts and per-stage ETA"
+        >
           <input name="start_date" type="date" className="input" />
         </Field>
 
-        <Field label="Default pace (km/h)">
-          <input
-            name="pace"
-            type="number"
-            min="1"
-            max="15"
-            step="0.5"
-            defaultValue="4.0"
-            className="input"
-          />
-        </Field>
+        {/* Pace */}
+        <div className="space-y-2">
+          <span className="text-sm font-medium">Default pace</span>
+          <div className="grid grid-cols-3 gap-2">
+            {PACE_PRESETS.map((opt) => (
+              <button
+                key={opt.kmh}
+                type="button"
+                onClick={() => setPace(opt.kmh)}
+                className={cn(
+                  'flex flex-col items-center gap-0.5 rounded-xl border px-3 py-3 text-center transition-colors',
+                  pace === opt.kmh
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border bg-background hover:bg-muted',
+                )}
+              >
+                <span className="text-sm font-semibold">{opt.label}</span>
+                <span className={cn(
+                  'text-xs tabular-nums',
+                  pace === opt.kmh ? 'opacity-75' : 'text-muted-foreground',
+                )}>
+                  {opt.kmh} km/h
+                </span>
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {PACE_PRESETS.find((p) => p.kmh === pace)?.hint}
+          </p>
+        </div>
 
+        {/* Error */}
         {error && (
-          <p className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <p className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {error}
           </p>
         )}
 
+        {/* Submit */}
         <button
           type="submit"
           disabled={pending}
-          className="w-full rounded-full bg-primary py-3 text-base font-semibold text-primary-foreground disabled:opacity-50"
+          className="w-full rounded-full bg-primary py-3.5 text-base font-semibold text-primary-foreground disabled:opacity-50"
         >
           {pending ? 'Creating…' : 'Create Trail'}
         </button>
@@ -112,10 +152,12 @@ export default function NewTrailPage() {
 
 function Field({
   label,
+  hint,
   required,
   children,
 }: {
   label: string;
+  hint?: string;
   required?: boolean;
   children: React.ReactNode;
 }) {
@@ -126,6 +168,7 @@ function Field({
         {required && <span className="ml-0.5 text-destructive">*</span>}
       </label>
       {children}
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }
