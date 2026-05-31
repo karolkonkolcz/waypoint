@@ -7,13 +7,19 @@ import { ArrowLeftIcon, ClockIcon, TrendingUpIcon, MoveHorizontalIcon, ChevronLe
 import { stageRepo } from '@/lib/db/repositories/stage.repo';
 import { trailRepo } from '@/lib/db/repositories/trail.repo';
 import { routeRepo } from '@/lib/db/repositories/route.repo';
+import { weatherRepo } from '@/lib/db/repositories/weather.repo';
 import { ElevationChart } from '@/components/route/ElevationChart';
+import { WeatherCard } from '@/components/stage/WeatherCard';
+import { fetchOpenMeteo } from '@/lib/weather/openmeteo';
+import { buildSnapshot } from '@/lib/weather/forecast';
+import type { WeatherSnapshot } from '@/lib/weather/forecast';
+import { pointAtDistance } from '@/lib/domain/geo';
 import { StageHeader } from '@/components/stage/StageHeader';
 import { StageStats } from '@/components/stage/StageStats';
 import { DifficultyBadge } from '@/components/difficulty/DifficultyBadge';
 import type { DifficultyClass } from '@/lib/domain/difficulty';
 import { naismithHours } from '@/lib/domain/eta';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { db } from '@/lib/db/dexie';
 
 export default function StagePage() {
@@ -23,6 +29,58 @@ export default function StagePage() {
   const stage = useLiveQuery(() => stageRepo.findById(stageId), [stageId]);
   const allStages = useLiveQuery(() => stageRepo.findByTrail(trailId), [trailId]);
   const route = useLiveQuery(() => routeRepo.findByTrail(trailId), [trailId]);
+  const cachedWeather = useLiveQuery(() => weatherRepo.findByStage(stageId), [stageId]);
+
+  const [fetchingWeather, setFetchingWeather] = useState(false);
+
+  useEffect(() => {
+    if (!stage || !trail || !route || !allStages) return;
+    if (stage.start_distance_km === null || stage.end_distance_km === null) return;
+    if (!trail.start_date) return;
+    if (cachedWeather !== undefined && weatherRepo.isFresh(cachedWeather)) return;
+
+    const idx = allStages.findIndex((s) => s.id === stageId);
+    if (idx < 0) return;
+
+    const d = new Date(trail.start_date + 'T00:00:00');
+    d.setDate(d.getDate() + idx);
+    const targetDate = d.toISOString().split('T')[0];
+
+    // Open-Meteo only forecasts 16 days ahead
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const daysAhead = (new Date(targetDate + 'T00:00:00').getTime() - todayStart.getTime()) / 86_400_000;
+    if (daysAhead < 0 || daysAhead > 16) return;
+
+    const midKm = (stage.start_distance_km + stage.end_distance_km) / 2;
+    const [lon, lat] = pointAtDistance(route.geojson, midKm);
+
+    setFetchingWeather(true);
+    fetchOpenMeteo(lat, lon, targetDate)
+      .then((result) => {
+        const snapshot = buildSnapshot(result, targetDate);
+        return weatherRepo.save({
+          trail_id: trail.id,
+          stage_id: stage.id,
+          user_id: trail.user_id,
+          lat,
+          lon,
+          date: targetDate,
+          snapshot,
+        });
+      })
+      .catch(console.error)
+      .finally(() => setFetchingWeather(false));
+  }, [
+    stageId,
+    trail?.id,
+    trail?.start_date,
+    route?.id,
+    stage?.start_distance_km,
+    stage?.end_distance_km,
+    allStages,
+    cachedWeather?.fetched_at,
+  ]);
 
   const [editing, setEditing] = useState(false);
 
@@ -113,6 +171,18 @@ export default function StagePage() {
           <ElevationChart profile={stageProfile} />
         </section>
       )}
+
+      {/* Weather forecast */}
+      {cachedWeather ? (
+        <div className="mb-6">
+          <WeatherCard
+            snapshot={cachedWeather.forecast_json as WeatherSnapshot}
+            loading={fetchingWeather}
+          />
+        </div>
+      ) : fetchingWeather ? (
+        <div className="mb-6 h-32 animate-pulse rounded-2xl bg-muted" />
+      ) : null}
 
       {/* Difficulty detail */}
       {stage.difficulty_class && (
