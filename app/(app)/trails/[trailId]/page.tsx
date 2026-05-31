@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { trailRepo } from '@/lib/db/repositories/trail.repo';
 import { stageRepo } from '@/lib/db/repositories/stage.repo';
+import { routeRepo } from '@/lib/db/repositories/route.repo';
+import { GpxUploadZone } from '@/components/route/GpxUploadZone';
 import { DifficultyBadge } from '@/components/difficulty/DifficultyBadge';
 import type { DifficultyClass } from '@/lib/domain/difficulty';
 import { naismithHours } from '@/lib/domain/eta';
@@ -24,6 +26,7 @@ export default function TrailPage() {
 
   const trail = useLiveQuery(() => trailRepo.findById(trailId), [trailId]);
   const stages = useLiveQuery(() => stageRepo.findByTrail(trailId), [trailId]);
+  const route = useLiveQuery(() => routeRepo.findByTrail(trailId), [trailId]);
 
   const totalDistanceKm = stages?.reduce((sum, s) => sum + s.distance_km, 0) ?? 0;
   const totalAscentM = stages?.reduce((sum, s) => sum + s.ascent_m, 0) ?? 0;
@@ -72,6 +75,12 @@ export default function TrailPage() {
           <span>{trail.default_pace_kmh} km/h</span>
         </div>
       )}
+
+      {/* Route */}
+      <div className="mb-5">
+        <h2 className="mb-2 font-semibold">Route</h2>
+        <GpxUploadZone trailId={trailId} userId={trail.user_id} existing={route ?? undefined} />
+      </div>
 
       {/* Stages */}
       <div className="mb-3 flex items-center justify-between">
