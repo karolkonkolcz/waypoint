@@ -9,6 +9,7 @@ import {
   ChevronRightIcon,
   CalendarIcon,
   GaugeIcon,
+  Link2Icon,
 } from 'lucide-react';
 import { trailRepo } from '@/lib/db/repositories/trail.repo';
 import { stageRepo } from '@/lib/db/repositories/stage.repo';
@@ -18,6 +19,7 @@ import { ElevationChart } from '@/components/route/ElevationChart';
 import { DifficultyBadge } from '@/components/difficulty/DifficultyBadge';
 import type { DifficultyClass } from '@/lib/domain/difficulty';
 import { naismithHours } from '@/lib/domain/eta';
+import { assignStageBoundaries } from '@/lib/domain/stages';
 import { useState } from 'react';
 import { stageRepo as sr } from '@/lib/db/repositories/stage.repo';
 import { createClient } from '@/lib/supabase/client';
@@ -29,11 +31,29 @@ export default function TrailPage() {
   const stages = useLiveQuery(() => stageRepo.findByTrail(trailId), [trailId]);
   const route = useLiveQuery(() => routeRepo.findByTrail(trailId), [trailId]);
 
+  const [linking, setLinking] = useState(false);
+
   const totalDistanceKm = stages?.reduce((sum, s) => sum + s.distance_km, 0) ?? 0;
   const totalAscentM = stages?.reduce((sum, s) => sum + s.ascent_m, 0) ?? 0;
   const totalHours = stages
     ? naismithHours(totalDistanceKm, totalAscentM, trail?.default_pace_kmh ?? 4)
     : 0;
+
+  async function handleLinkStages() {
+    if (!stages?.length || !route) return;
+    setLinking(true);
+    try {
+      const boundaries = assignStageBoundaries(stages);
+      for (const b of boundaries) {
+        await stageRepo.update(b.id, {
+          start_distance_km: b.start_distance_km,
+          end_distance_km: b.end_distance_km,
+        });
+      }
+    } finally {
+      setLinking(false);
+    }
+  }
 
   if (trail === undefined || stages === undefined) {
     return <LoadingState />;
@@ -79,7 +99,19 @@ export default function TrailPage() {
 
       {/* Route */}
       <div className="mb-5">
-        <h2 className="mb-2 font-semibold">Route</h2>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="font-semibold">Route</h2>
+          {route && stages.length > 0 && (
+            <button
+              onClick={handleLinkStages}
+              disabled={linking}
+              className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs font-medium hover:bg-accent disabled:opacity-50"
+            >
+              <Link2Icon className={`h-3 w-3 ${linking ? 'animate-pulse' : ''}`} />
+              {linking ? 'Linking…' : 'Link stages'}
+            </button>
+          )}
+        </div>
         <GpxUploadZone trailId={trailId} userId={trail.user_id} existing={route ?? undefined} />
         {route && (
           <ElevationChart profile={route.elevation_profile} className="mt-2" />
