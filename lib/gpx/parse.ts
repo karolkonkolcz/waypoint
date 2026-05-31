@@ -9,6 +9,13 @@ export interface ParsedGPX {
   elevation_profile: { d_km: number; ele_m: number }[];
 }
 
+/** A single `<trk>`/`<rte>` from a GPX file — one hiking day. */
+export interface ParsedTrack extends ParsedGPX {
+  name: string | null;
+  /** First integer found in the track name (e.g. "Deň 6" → 6), or null. */
+  dayNumber: number | null;
+}
+
 // Filter elevation changes below this threshold to reduce GPS noise.
 const NOISE_M = 3;
 const MAX_PROFILE_POINTS = 500;
@@ -20,6 +27,10 @@ export class GPXParseError extends Error {
   }
 }
 
+// One <trk>…</trk> or <rte>…</rte> block (a single day/segment).
+const TRACK_RE = /<(trk|rte)\b[\s\S]*?<\/\1>/g;
+// First <name> inside a track block.
+const NAME_RE = /<name>\s*([\s\S]*?)\s*<\/name>/;
 // Matches trkpt/rtept in both self-closing (<trkpt .../>) and full (<trkpt ...>...</trkpt>) form.
 const POINT_RE = /<(trkpt|rtept)([\s\S]*?)(?:\/>|>([\s\S]*?)<\/\1>)/g;
 const LAT_RE = /\blat=["']([^"']+)["']/;
@@ -71,14 +82,8 @@ function downsampleProfile(
   return result;
 }
 
-/**
- * Parses a GPX XML string and returns geometry + statistics.
- * Supports both <trkpt> (track) and <rtept> (route) elements.
- * Works in browser and Node.js (no DOMParser dependency).
- */
-export function parseGPX(xmlText: string): ParsedGPX {
-  const points = extractPoints(xmlText);
-
+/** Computes geometry + statistics from an ordered list of raw points. */
+function buildFromPoints(points: RawPoint[]): ParsedGPX {
   if (points.length < 2) {
     throw new GPXParseError('GPX must contain at least 2 track points');
   }
@@ -110,4 +115,113 @@ export function parseGPX(xmlText: string): ParsedGPX {
     total_descent_m: Math.round(descentM),
     elevation_profile: downsampleProfile(rawProfile),
   };
+}
+
+/** Extracts the first integer in a track name ("Deň 6 - nedela" → 6). */
+function extractDayNumber(name: string | null): number | null {
+  if (!name) return null;
+  const m = name.match(/\d{1,4}/);
+  return m ? parseInt(m[0], 10) : null;
+}
+
+function firstPoint(t: ParsedTrack): [number, number] {
+  const [lon, lat] = t.geojson.coordinates[0];
+  return [lon, lat];
+}
+
+function lastPoint(t: ParsedTrack): [number, number] {
+  const [lon, lat] = t.geojson.coordinates[t.geojson.coordinates.length - 1];
+  return [lon, lat];
+}
+
+/** Sum of the gaps between consecutive tracks' end → next start (km). */
+function gapSum(tracks: ParsedTrack[]): number {
+  let sum = 0;
+  for (let i = 0; i < tracks.length - 1; i++) {
+    sum += haversineKm(lastPoint(tracks[i]), firstPoint(tracks[i + 1]));
+  }
+  return sum;
+}
+
+/**
+ * Orders day-tracks into hiking sequence.
+ * - If every track carries a distinct day number (e.g. mapy.com "Deň N"),
+ *   sort by it ascending.
+ * - Otherwise pick the orientation (file order vs reversed) whose consecutive
+ *   tracks connect best — mapy.com exports days in reverse, so this un-reverses
+ *   them and avoids stitching the route with phantom inter-day jumps.
+ */
+function orderTracks(tracks: ParsedTrack[]): ParsedTrack[] {
+  if (tracks.length <= 1) return tracks;
+
+  const days = tracks.map((t) => t.dayNumber);
+  const allNumbered = days.every((d) => d !== null);
+  const allDistinct = new Set(days).size === tracks.length;
+  if (allNumbered && allDistinct) {
+    return [...tracks].sort((a, b) => (a.dayNumber as number) - (b.dayNumber as number));
+  }
+
+  const reversed = [...tracks].reverse();
+  return gapSum(reversed) < gapSum(tracks) ? reversed : tracks;
+}
+
+/**
+ * Parses a GPX file into one ParsedTrack per `<trk>`/`<rte>` (one per hiking day),
+ * ordered into hiking sequence. Each track keeps its own geometry and statistics —
+ * tracks are never stitched together, so cross-day jumps never pollute the numbers.
+ *
+ * Works in browser and Node.js (no DOMParser dependency).
+ */
+export function parseGPXTracks(xmlText: string): ParsedTrack[] {
+  const tracks: ParsedTrack[] = [];
+  let block: RegExpExecArray | null;
+  TRACK_RE.lastIndex = 0;
+
+  while ((block = TRACK_RE.exec(xmlText)) !== null) {
+    const blockXml = block[0];
+    const points = extractPoints(blockXml);
+    if (points.length < 2) continue; // skip empty/degenerate tracks
+
+    const nameM = NAME_RE.exec(blockXml);
+    const name = nameM ? nameM[1].trim() || null : null;
+
+    tracks.push({
+      ...buildFromPoints(points),
+      name,
+      dayNumber: extractDayNumber(name),
+    });
+  }
+
+  if (tracks.length === 0) {
+    throw new GPXParseError('GPX contains no track with at least 2 points');
+  }
+
+  return orderTracks(tracks);
+}
+
+/**
+ * Parses a GPX file into a single merged route (all tracks concatenated in
+ * hiking order). Kept for single-track files and the trail-level overview.
+ * For per-day stages use {@link parseGPXTracks}.
+ */
+export function parseGPX(xmlText: string): ParsedGPX {
+  const tracks = parseGPXTracks(xmlText);
+  if (tracks.length === 1) return stripTrackMeta(tracks[0]);
+
+  // Merge ordered tracks, dropping a duplicated boundary point where one day's
+  // end coincides with the next day's start.
+  const merged: RawPoint[] = [];
+  for (const t of tracks) {
+    for (const [lon, lat, ele] of t.geojson.coordinates) {
+      const prev = merged[merged.length - 1];
+      if (prev && prev.lon === lon && prev.lat === lat) continue;
+      merged.push({ lon, lat, ele: ele ?? 0 });
+    }
+  }
+  return buildFromPoints(merged);
+}
+
+function stripTrackMeta(t: ParsedTrack): ParsedGPX {
+  const { name: _name, dayNumber: _dayNumber, ...rest } = t;
+  return rest;
 }

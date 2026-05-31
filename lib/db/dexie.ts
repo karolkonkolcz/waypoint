@@ -21,6 +21,8 @@ export interface TrailRow extends Sync {
 export interface RouteRow extends Sync {
   id: string;
   trail_id: string;
+  // Per-stage geometry: each hiking day owns one route. null = legacy trail-level route.
+  stage_id: string | null;
   user_id: string;
   geojson: GeoJSONLineString;
   total_distance_km: number;
@@ -98,6 +100,20 @@ class WaypointDB extends Dexie {
       weather: 'id, trail_id, stage_id, fetched_at',
       syncQueue: '++seq, entity, created_at',
     });
+
+    // v2: route per stage — index stage_id, backfill existing rows to null.
+    this.version(2)
+      .stores({
+        routes: 'id, trail_id, stage_id, _dirty',
+      })
+      .upgrade((tx) =>
+        tx
+          .table<RouteRow>('routes')
+          .toCollection()
+          .modify((r) => {
+            if (r.stage_id === undefined) r.stage_id = null;
+          }),
+      );
   }
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseGPX, GPXParseError } from '../parse';
+import { parseGPX, parseGPXTracks, GPXParseError } from '../parse';
 
 const SIMPLE_GPX = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="test">
@@ -109,5 +109,67 @@ describe('parseGPX', () => {
     expect(result.elevation_profile.length).toBeLessThanOrEqual(500);
     // Last profile point preserves the final elevation
     expect(result.elevation_profile[result.elevation_profile.length - 1].ele_m).toBe(1099);
+  });
+});
+
+// Two days that connect end→start: day 1 ends where day 2 begins.
+const day1 = `<trk><name>Deň 1 - pondelok</name><trkseg>
+  <trkpt lat="42.0" lon="9.0"><ele>1000</ele></trkpt>
+  <trkpt lat="42.01" lon="9.01"><ele>1100</ele></trkpt>
+</trkseg></trk>`;
+const day2 = `<trk><name>Deň 2 - utorok</name><trkseg>
+  <trkpt lat="42.01" lon="9.01"><ele>1100</ele></trkpt>
+  <trkpt lat="42.02" lon="9.02"><ele>1050</ele></trkpt>
+</trkseg></trk>`;
+
+const wrap = (inner: string) => `<?xml version="1.0"?><gpx version="1.1">${inner}</gpx>`;
+const orderedFile = wrap(`${day1}${day2}`);
+// mapy.com exports days in reverse order (last day first).
+const reversedFile = wrap(`${day2}${day1}`);
+
+describe('parseGPXTracks', () => {
+  it('returns one track per <trk> with its name and day number', () => {
+    const tracks = parseGPXTracks(orderedFile);
+    expect(tracks).toHaveLength(2);
+    expect(tracks[0].name).toBe('Deň 1 - pondelok');
+    expect(tracks[0].dayNumber).toBe(1);
+    expect(tracks[1].dayNumber).toBe(2);
+  });
+
+  it('computes per-track stats independently (no cross-track stitching)', () => {
+    const tracks = parseGPXTracks(orderedFile);
+    expect(tracks[0].total_ascent_m).toBe(100); // 1000 -> 1100
+    expect(tracks[0].total_descent_m).toBe(0);
+    expect(tracks[1].total_ascent_m).toBe(0);
+    expect(tracks[1].total_descent_m).toBe(50); // 1100 -> 1050
+    expect(tracks[0].geojson.coordinates).toHaveLength(2);
+  });
+
+  it('orders reverse-exported days by their day number', () => {
+    const tracks = parseGPXTracks(reversedFile);
+    expect(tracks.map((t) => t.dayNumber)).toEqual([1, 2]);
+  });
+
+  it('falls back to continuity ordering when names lack day numbers', () => {
+    const noNums = wrap(
+      `${day2.replace('Deň 2 - utorok', 'utorok')}${day1.replace('Deň 1 - pondelok', 'pondelok')}`,
+    );
+    const tracks = parseGPXTracks(noNums);
+    // day1 (ends at 42.01,9.01) should come before day2 (starts at 42.01,9.01)
+    expect(tracks[0].geojson.coordinates[0]).toEqual([9.0, 42.0, 1000]);
+  });
+
+  it('throws when no track has at least 2 points', () => {
+    expect(() => parseGPXTracks(wrap(`<trk><name>x</name><trkseg></trkseg></trk>`))).toThrow(
+      GPXParseError,
+    );
+  });
+
+  it('parseGPX merges ordered tracks without phantom inter-day jumps', () => {
+    const merged = parseGPX(reversedFile);
+    // day1 (~1.4km) + day2 (~1.4km); boundary point deduped → no big jump
+    expect(merged.total_distance_km).toBeLessThan(4);
+    expect(merged.total_ascent_m).toBe(100);
+    expect(merged.total_descent_m).toBe(50);
   });
 });

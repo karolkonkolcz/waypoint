@@ -28,14 +28,13 @@ export default function StagePage() {
   const trail = useLiveQuery(() => trailRepo.findById(trailId), [trailId]);
   const stage = useLiveQuery(() => stageRepo.findById(stageId), [stageId]);
   const allStages = useLiveQuery(() => stageRepo.findByTrail(trailId), [trailId]);
-  const route = useLiveQuery(() => routeRepo.findByTrail(trailId), [trailId]);
+  const route = useLiveQuery(() => routeRepo.findByStage(stageId), [stageId]);
   const cachedWeather = useLiveQuery(() => weatherRepo.findByStage(stageId), [stageId]);
 
   const [fetchingWeather, setFetchingWeather] = useState(false);
 
   useEffect(() => {
     if (!stage || !trail || !route || !allStages) return;
-    if (stage.start_distance_km === null || stage.end_distance_km === null) return;
     if (!trail.start_date) return;
     if (cachedWeather !== undefined && weatherRepo.isFresh(cachedWeather)) return;
 
@@ -52,7 +51,8 @@ export default function StagePage() {
     const daysAhead = (new Date(targetDate + 'T00:00:00').getTime() - todayStart.getTime()) / 86_400_000;
     if (daysAhead < 0 || daysAhead > 16) return;
 
-    const midKm = (stage.start_distance_km + stage.end_distance_km) / 2;
+    // Weather is sampled at the midpoint of this stage's own route geometry.
+    const midKm = route.total_distance_km / 2;
     const [lon, lat] = pointAtDistance(route.geojson, midKm);
 
     setFetchingWeather(true);
@@ -76,8 +76,7 @@ export default function StagePage() {
     trail?.id,
     trail?.start_date,
     route?.id,
-    stage?.start_distance_km,
-    stage?.end_distance_km,
+    route?.total_distance_km,
     allStages,
     cachedWeather?.fetched_at,
   ]);
@@ -102,16 +101,8 @@ export default function StagePage() {
   const paceKmh = trail.default_pace_kmh;
   const totalHours = naismithHours(stage.distance_km, stage.ascent_m, paceKmh);
 
-  // Slice the route's elevation profile to this stage's distance window.
-  // Returns null until stage boundaries and a route are both present.
-  const stageProfile = (() => {
-    if (!route || stage.start_distance_km === null || stage.end_distance_km === null) return null;
-    const start = stage.start_distance_km;
-    const end = stage.end_distance_km;
-    const slice = route.elevation_profile.filter((p) => p.d_km >= start && p.d_km <= end);
-    // Remap so the profile starts at 0 km for display purposes
-    return slice.map((p) => ({ d_km: p.d_km - start, ele_m: p.ele_m }));
-  })();
+  // Each stage owns its route, whose profile already starts at 0 km.
+  const stageProfile = route ? route.elevation_profile : null;
   const stageIndex = allStages.findIndex((s) => s.id === stageId);
   const prevStage = stageIndex > 0 ? allStages[stageIndex - 1] : null;
   const nextStage = stageIndex < allStages.length - 1 ? allStages[stageIndex + 1] : null;

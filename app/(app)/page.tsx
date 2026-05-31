@@ -8,6 +8,7 @@ import { db } from '@/lib/db/dexie';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { GpxImportZone } from '@/components/route/GpxImportZone';
 
 export default function HomePage() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -51,6 +52,9 @@ export default function HomePage() {
           <PlusIcon className="h-5 w-5" />
         </Link>
       </header>
+
+      {/* Import a multi-day GPX trek as a trail with one stage per day */}
+      {userId && <GpxImportZone userId={userId} />}
 
       {trails === undefined && (
         <div className="space-y-3">
