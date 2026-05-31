@@ -398,18 +398,62 @@ go straight to the (local) data. If offline and no session, show a friendly
 "sign in once while online" screen. Sign-in (magic link / email) is the only
 hard online dependency.
 
-### 7.3 Offline map tiles (D8 — highest-risk item)
+### 7.3 Map (F4a — implemented, F4b — deferred)
 
-Recommended: **PMTiles**. Per trail, let the user "Download offline map" for the
-route's bounding box at a sensible zoom range. Store the `.pmtiles` file in
-**OPFS** (Origin Private File System) or IndexedDB, and point MapLibre at it via
-the PMTiles protocol. Benefits: a single file, no per-tile fetch storm, fully
-offline, policy-clean.
+**F4a (done):** MapLibre GL JS + MapTiler vector tiles.
 
-Do **not** crawl `tile.openstreetmap.org` — it violates the usage policy and
-breaks offline anyway. If PMTiles proves too heavy for MVP, the fallback is a
-single bundled low-zoom basemap for context plus the route polyline rendered
-from `routes.geojson` (which is always available offline).
+- `components/map/MapView.tsx` — client-only, code-split via
+  `dynamic(…, {ssr:false})`. MapLibre never enters the main bundle.
+- Basemap: **MapTiler outdoor-v2** (`NEXT_PUBLIC_MAPTILER_API_KEY`).
+  If the key is absent → graceful fallback: blank `#e8eae6` canvas with
+  the route polyline still drawn (works 100% offline).
+- Route polylines drawn from local `routes.geojson` (Dexie — always
+  available offline). Colors match difficulty tokens from `globals.css`
+  (Hard = `#ea580c`, Moderate = `#d97706`, Easy = `#16a34a`,
+  Extreme = `#dc2626`; default blue = `#2563eb`).
+- `bboxOf` / `mergeBboxes` in `geo.ts` → `fitBounds` zooms to the
+  route automatically.
+- `pmtiles` protocol registered at startup so F4b needs only a URL swap.
+- Two entry points: full-screen `trails/[trailId]/map/page.tsx` (trail
+  overview); compact 224 px section on the Stage page with "Full map"
+  link.
+
+**F4b (deferred):** Per-trail offline tile download. User triggers
+"Download offline map" → bounding box extracted → Protomaps regional
+`.pmtiles` file stored in **OPFS** → `pmtiles://` URL passed to the
+same `MapView`. No code changes needed in MapView.
+
+Do **not** crawl `tile.openstreetmap.org` — violates the usage policy.
+
+### 7.4 Weather alerts (F5 — implemented)
+
+MeteoAlarm (EUMETNET) CAP JSON feed. The browser cannot call it directly
+(CORS + user-agent blocking), so it goes through a thin server proxy.
+
+**Flow:** Stage page → `GET /api/alerts?lat=…&lon=…` →
+`app/api/alerts/route.ts` (server) → `slugFromLatLon` maps the stage
+midpoint to a country → `feeds.meteoalarm.org/api/v1/warnings/feeds-{country}` →
+`parseMeteoalarmFeed` normalises CAP JSON → Dexie `alerts` table
+(cache-only, **never synced to Supabase**, 3 h TTL) → `WeatherAlertBadge`.
+
+**Feed shape (verified against live SK feed):**
+`warnings[].alert.info[].parameter[]` → `awareness_level: "2; yellow; Moderate"`,
+`awareness_type: "3; Thunderstorm"`, `onset`, `expires`,
+`area[].areaDesc`, `senderName`.
+
+**Normalisation (`lib/alerts/meteoalarm.ts`):**
+- Prefer English `info` entry; skip green/level-1 and expired warnings.
+- Deduplicate by `(severity, event)`, merge area names, latest expiry
+  wins.
+- Sort most-severe first (red > orange > yellow).
+- `slugFromLatLon` uses a coarse country-bbox table (Corsica → `france`
+  before mainland Italy).
+
+**Offline fallback:** serves cached snapshot and surfaces its age
+("Warnings may be out of date (offline)."). No hard failure.
+
+**Server-side revalidation:** `next: {revalidate: 1800}` on the upstream
+fetch — 30 min CDN/edge cache for the MeteoAlarm response.
 
 ---
 
