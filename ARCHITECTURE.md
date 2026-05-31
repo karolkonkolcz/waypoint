@@ -67,7 +67,7 @@ Each is binding for the MVP.
 | # | Conflict in source docs | Decision |
 |---|---|---|
 | D1 | AGENTS.md separates **Trail** (the objective route, e.g. PCT) from **Itinerary** (user's plan: start date, pace, prefs). PRD.md merges them into one `trails` table. | **Merge for MVP.** One `trails` table = "a user's hike plan". It carries `start_date`, `default_pace_kmh`, `preferences`. Splitting into shared trail templates + per-user itineraries is a **V3** concern (itinerary templates) and must not be built now. |
-| D2 | GPX import and the map and the ETA engine all need the **route geometry**, but no table or field stores it. | Add a **`routes`** table holding the GeoJSON `LineString` + derived stats. Stages map onto the route via `start_distance_km` / `end_distance_km`. |
+| D2 | GPX import and the map and the ETA engine all need the **route geometry**, but no table or field stores it. | Add a **`routes`** table holding the GeoJSON `LineString` + derived stats. Originally stages mapped onto a single trail-level route via `start_distance_km` / `end_distance_km`. **Updated MVP decision:** each stage now owns its own route (`routes.stage_id`). One `<trk>` in the GPX = one stage = one route. This eliminates error-prone distance slicing and makes per-stage weather sampling, ETA, and the elevation profile self-contained. See §5.2 (GPX import) and migration `0004_route_per_stage`. |
 | D3 | PRD `trails` has no **pace** field, but the ETA engine needs it. | `trails.default_pace_kmh` added (overridable per stage later). |
 | D4 | PRD defines a `users` table, but Supabase already owns `auth.users`. | Use a **`profiles`** table keyed by `auth.users.id`. Never create a parallel users table. |
 | D5 | `weather_cache` as one `forecast_json` blob per trail is too coarse to answer *"where will I be when the rain starts?"* | Redesign as **per-stage, per-sample-point** forecasts (see §6). |
@@ -117,7 +117,9 @@ waypoint/
 │  │  ├─ server.ts                   # server client (SSR shell / login)
 │  │  └─ types.ts                    # generated DB types
 │  ├─ validation/schemas.ts          # Zod schemas (shared client + server)
-│  └─ gpx/parse.ts                   # GPX → LineString + stats
+│  └─ gpx/
+│     ├─ parse.ts                    # parseGPXTracks() + parseGPX() — multi-track aware
+│     └─ import.ts                   # importTrek() — trail + stages + routes in one shot
 ├─ public/
 │  ├─ icons/                         # PWA icons (SVG/PNG)
 │  └─ basemap/                       # optional bundled PMTiles style
@@ -177,16 +179,19 @@ create table public.trails (
   deleted_at       timestamptz
 );
 
--- routes (geometry; see D2) ----------------------------------------------
+-- routes (geometry; see D2 + §5.2) ----------------------------------------
+-- Each stage owns one route (stage_id NOT NULL after import).
+-- null stage_id is reserved for a future trail-level merged overview geometry.
 create table public.routes (
   id                uuid primary key,
   trail_id          uuid not null references public.trails(id) on delete cascade,
+  stage_id          uuid references public.stages(id) on delete cascade, -- per-stage (0004)
   user_id           uuid not null references auth.users(id) on delete cascade,
   geojson           jsonb not null,            -- GeoJSON LineString [lon,lat,ele?]
   total_distance_km numeric(8,2) not null,
   total_ascent_m    integer not null,
   total_descent_m   integer not null,
-  elevation_profile jsonb not null default '[]'::jsonb, -- [{d_km, ele_m}] downsampled
+  elevation_profile jsonb not null default '[]'::jsonb, -- [{d_km, ele_m}] downsampled ≤500 pts
   source            text not null default 'gpx' check (source in ('gpx','manual')),
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now(),
@@ -203,8 +208,8 @@ create table public.stages (
   distance_km       numeric(6,2) not null,
   ascent_m          integer not null default 0,
   descent_m         integer not null default 0,
-  start_distance_km numeric(8,2),  -- offset along route.geojson (see D2)
-  end_distance_km   numeric(8,2),
+  start_distance_km numeric(8,2),  -- deprecated; kept for compat, not used when stage owns its route
+  end_distance_km   numeric(8,2),  -- deprecated; same
   difficulty_score  smallint check (difficulty_score between 0 and 100),
   difficulty_class  text check (difficulty_class in ('easy','moderate','hard','extreme')),
   notes             text,
@@ -251,6 +256,7 @@ create table public.weather_cache (
 -- indexes ----------------------------------------------------------------
 create index on public.trails        (user_id, updated_at);
 create index on public.routes        (trail_id);
+create index on public.routes        (stage_id);    -- added by 0004_route_per_stage
 create index on public.stages        (trail_id, order_index);
 create index on public.waypoints     (trail_id, type);
 create index on public.weather_cache (stage_id, fetched_at);
@@ -264,7 +270,48 @@ create trigger t_waypoints     before update on public.waypoints     for each ro
 create trigger t_weather_cache before update on public.weather_cache for each row execute function public.set_updated_at();
 ```
 
-### 5.1 Row Level Security
+### 5.1 GPX import flow
+
+The primary way a user creates a trail is by importing a **multi-day GPX file**
+exported from mapy.com (or any GPX tool that uses one `<trk>` per day).
+
+```
+GPX file
+└─ <trk> "Deň 1 – utorok"   →  stage (order 0)  +  route (stage_id = stage.id)
+└─ <trk> "Deň 2 – streda"   →  stage (order 1)  +  route (stage_id = stage.id)
+   ...
+└─ <trk> "Deň N"            →  stage (order N-1) +  route (stage_id = stage.id)
+```
+
+**Parser (`lib/gpx/parse.ts` → `parseGPXTracks`)**
+
+- Splits on `<trk>` / `<rte>` boundaries — never stitches across them.
+  Stitching caused phantom ~16 km inter-day jumps (mapy.com exports days
+  in *reverse* order; the parser un-reverses them).
+- **Ordering:** primary = integer extracted from track name (`"Deň 6"` → 6);
+  fallback = continuity heuristic (which orientation minimises end→start gaps).
+- Per-track stats (distance, ascent, descent, elevation profile) are
+  computed independently. `parseGPX()` merges ordered tracks (with boundary
+  dedup) for any caller that still needs a single LineString.
+
+**Orchestration (`lib/gpx/import.ts` → `importTrek`)**
+
+1. `parseGPXTracks(xml)` → ordered `ParsedTrack[]`
+2. `trailRepo.create(...)` — name derived from file name (`deriveTrailName`)
+3. For each track: `stageRepo.create(...)` (difficulty computed automatically)
+4. `routeRepo.bulkCreate(...)` — one route per stage, Dexie transaction
+5. Redirect to new trail
+
+**UI (`components/route/GpxImportZone.tsx`)**
+
+- File pick → immediate parse → **preview modal** (N days, total km/↑m,
+  per-day list) so the user can confirm before anything is written.
+- Trail name (pre-filled from file) + optional start date (required for
+  weather forecasts).
+- Cancel at any point; nothing is written until "Create trail" is confirmed.
+- Lives on the Home screen above the trail list.
+
+### 5.2 Row Level Security
 
 Enable RLS on every table; each row is owner-only. Thanks to the denormalized
 `user_id`, every policy is a single `auth.uid() = user_id` check.
@@ -309,9 +356,10 @@ create policy "own weather" on public.weather_cache
 directly, saving a backend hop. Use `app/api/weather/route.ts` only if you later
 need server-side rate limiting or caching; it is optional for MVP.
 
-**Sampling.** For each stage, sample N representative points along the route
-slice (`start_distance_km` → `end_distance_km`): start, midpoint(s), end — e.g.
-one point every ~10 km. Fetch the hourly forecast for each.
+**Sampling.** Each stage owns its own route geometry (see §5.1). Sample the
+midpoint of that geometry (`route.total_distance_km / 2` → `pointAtDistance`)
+for the weather fetch. For longer stages, `samplePoints(line, N)` can provide
+additional sample points. Fetch the Open-Meteo hourly forecast for each point.
 
 **"Where will I be when the rain starts?"** (`lib/domain/weather.ts`):
 
@@ -378,9 +426,11 @@ export interface TrailRow extends Sync {
   start_date: string | null; default_pace_kmh: number; preferences: Record<string, unknown>;
 }
 export interface RouteRow extends Sync {
-  id: string; trail_id: string; user_id: string; geojson: GeoJSON.LineString;
-  total_distance_km: number; total_ascent_m: number; total_descent_m: number;
+  id: string; trail_id: string; stage_id: string | null; user_id: string;
+  geojson: GeoJSON.LineString; total_distance_km: number;
+  total_ascent_m: number; total_descent_m: number;
   elevation_profile: { d_km: number; ele_m: number }[]; source: 'gpx' | 'manual';
+  // stage_id = null reserved for future trail-level overview geometry
 }
 export interface StageRow extends Sync {
   id: string; trail_id: string; user_id: string; title: string; order_index: number;
@@ -420,6 +470,11 @@ class WaypointDB extends Dexie {
       weather:   'id, trail_id, stage_id, fetched_at',
       syncQueue: '++seq, entity, created_at',
     });
+    // v2: route per stage — adds stage_id index; backfills existing rows to null
+    this.version(2).stores({ routes: 'id, trail_id, stage_id, _dirty' })
+      .upgrade(tx => tx.table('routes').toCollection().modify(r => {
+        if (r.stage_id === undefined) r.stage_id = null;
+      }));
   }
 }
 
