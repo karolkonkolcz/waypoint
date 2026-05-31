@@ -14,6 +14,7 @@ import { trailRepo } from '@/lib/db/repositories/trail.repo';
 import { stageRepo } from '@/lib/db/repositories/stage.repo';
 import { routeRepo } from '@/lib/db/repositories/route.repo';
 import { GpxUploadZone } from '@/components/route/GpxUploadZone';
+import { ElevationChart } from '@/components/route/ElevationChart';
 import { DifficultyBadge } from '@/components/difficulty/DifficultyBadge';
 import type { DifficultyClass } from '@/lib/domain/difficulty';
 import { naismithHours } from '@/lib/domain/eta';
@@ -80,6 +81,9 @@ export default function TrailPage() {
       <div className="mb-5">
         <h2 className="mb-2 font-semibold">Route</h2>
         <GpxUploadZone trailId={trailId} userId={trail.user_id} existing={route ?? undefined} />
+        {route && (
+          <ElevationChart profile={route.elevation_profile} className="mt-2" />
+        )}
       </div>
 
       {/* Stages */}

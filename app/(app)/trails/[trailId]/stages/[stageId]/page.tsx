@@ -6,6 +6,8 @@ import { useParams } from 'next/navigation';
 import { ArrowLeftIcon, ClockIcon, TrendingUpIcon, MoveHorizontalIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { stageRepo } from '@/lib/db/repositories/stage.repo';
 import { trailRepo } from '@/lib/db/repositories/trail.repo';
+import { routeRepo } from '@/lib/db/repositories/route.repo';
+import { ElevationChart } from '@/components/route/ElevationChart';
 import { StageHeader } from '@/components/stage/StageHeader';
 import { StageStats } from '@/components/stage/StageStats';
 import { DifficultyBadge } from '@/components/difficulty/DifficultyBadge';
@@ -20,6 +22,7 @@ export default function StagePage() {
   const trail = useLiveQuery(() => trailRepo.findById(trailId), [trailId]);
   const stage = useLiveQuery(() => stageRepo.findById(stageId), [stageId]);
   const allStages = useLiveQuery(() => stageRepo.findByTrail(trailId), [trailId]);
+  const route = useLiveQuery(() => routeRepo.findByTrail(trailId), [trailId]);
 
   const [editing, setEditing] = useState(false);
 
@@ -40,6 +43,17 @@ export default function StagePage() {
 
   const paceKmh = trail.default_pace_kmh;
   const totalHours = naismithHours(stage.distance_km, stage.ascent_m, paceKmh);
+
+  // Slice the route's elevation profile to this stage's distance window.
+  // Returns null until stage boundaries and a route are both present.
+  const stageProfile = (() => {
+    if (!route || stage.start_distance_km === null || stage.end_distance_km === null) return null;
+    const start = stage.start_distance_km;
+    const end = stage.end_distance_km;
+    const slice = route.elevation_profile.filter((p) => p.d_km >= start && p.d_km <= end);
+    // Remap so the profile starts at 0 km for display purposes
+    return slice.map((p) => ({ d_km: p.d_km - start, ele_m: p.ele_m }));
+  })();
   const stageIndex = allStages.findIndex((s) => s.id === stageId);
   const prevStage = stageIndex > 0 ? allStages[stageIndex - 1] : null;
   const nextStage = stageIndex < allStages.length - 1 ? allStages[stageIndex + 1] : null;
@@ -89,6 +103,16 @@ export default function StagePage() {
 
       {/* Stats grid */}
       <StageStats stats={stats} className="mb-6" />
+
+      {/* Elevation profile — visible once route + stage boundaries are linked */}
+      {stageProfile && (
+        <section className="mb-6 rounded-2xl border bg-card px-4 pt-3 pb-2">
+          <h2 className="mb-1 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+            Elevation
+          </h2>
+          <ElevationChart profile={stageProfile} />
+        </section>
+      )}
 
       {/* Difficulty detail */}
       {stage.difficulty_class && (
