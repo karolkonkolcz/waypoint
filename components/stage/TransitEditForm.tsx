@@ -32,6 +32,12 @@ function blankMilestone(): Milestone {
   return { id: newId(), time: null, title: '', kind: 'transfer', location: null, notes: null };
 }
 
+/** Parses a coordinate string; returns null if not a finite number within ±max. */
+function parseCoord(raw: string, max: number): number | null {
+  const v = parseFloat(raw);
+  return Number.isFinite(v) && Math.abs(v) <= max ? v : null;
+}
+
 export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: () => void }) {
   const [pending, setPending] = useState(false);
   const [title, setTitle] = useState(stage.title);
@@ -49,7 +55,15 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
   const [showMap, setShowMap] = useState(false);
   const skipSearch = useRef(false);
 
-  const hasAnchor = lat.trim() !== '' && lon.trim() !== '';
+  // Validity (not just non-empty) drives the anchor, so bad manual input can't
+  // masquerade as a set location and then get silently dropped on save.
+  const latVal = parseCoord(lat, 90);
+  const lonVal = parseCoord(lon, 180);
+  const hasAnchor = latVal !== null && lonVal !== null;
+  const latError = lat.trim() !== '' && latVal === null;
+  const lonError = lon.trim() !== '' && lonVal === null;
+  const partialCoords = (lat.trim() !== '') !== (lon.trim() !== '');
+  const coordsInvalid = latError || lonError || partialCoords;
 
   // Trail routes give the picker geographic context (and auto-fit the trek).
   const trailRoutes = useLiveQuery(() => routeRepo.findAllByTrail(stage.trail_id), [stage.trail_id]);
@@ -83,10 +97,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
     };
   }, [allStages, trailRoutes, stage.id]);
 
-  const latN = parseFloat(lat);
-  const lonN = parseFloat(lon);
-  const markerPoint =
-    Number.isFinite(latN) && Number.isFinite(lonN) ? { lat: latN, lon: lonN } : null;
+  const markerPoint = latVal !== null && lonVal !== null ? { lat: latVal, lon: lonVal } : null;
 
   // Debounced search: refetch ~300ms after typing stops; abort stale requests.
   useEffect(() => {
@@ -163,11 +174,6 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
       return next;
     });
   }
-
-  const parseCoord = (raw: string, max: number): number | null => {
-    const v = parseFloat(raw);
-    return Number.isFinite(v) && Math.abs(v) <= max ? v : null;
-  };
 
   async function handleSave() {
     setPending(true);
@@ -435,28 +441,41 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
           </div>
         )}
 
-        {showManual && !hasAnchor && (
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Latitude</label>
-              <input
-                value={lat}
-                onChange={(e) => setLat(e.target.value)}
-                inputMode="decimal"
-                placeholder="42.7028"
-                className="input"
-              />
+        {(showManual || coordsInvalid) && !hasAnchor && (
+          <div className="space-y-1">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Latitude</label>
+                <input
+                  value={lat}
+                  onChange={(e) => setLat(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="42.7028"
+                  aria-invalid={latError}
+                  className={`input ${latError ? 'border-destructive' : ''}`}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Longitude</label>
+                <input
+                  value={lon}
+                  onChange={(e) => setLon(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="9.4503"
+                  aria-invalid={lonError}
+                  className={`input ${lonError ? 'border-destructive' : ''}`}
+                />
+              </div>
             </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Longitude</label>
-              <input
-                value={lon}
-                onChange={(e) => setLon(e.target.value)}
-                inputMode="decimal"
-                placeholder="9.4503"
-                className="input"
-              />
-            </div>
+            {latError && (
+              <p className="text-xs text-destructive">Latitude must be a number between −90 and 90.</p>
+            )}
+            {lonError && (
+              <p className="text-xs text-destructive">Longitude must be a number between −180 and 180.</p>
+            )}
+            {partialCoords && !latError && !lonError && (
+              <p className="text-xs text-destructive">Enter both latitude and longitude.</p>
+            )}
           </div>
         )}
 
@@ -490,7 +509,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
         <button
           type="button"
           onClick={handleSave}
-          disabled={pending || title.trim() === ''}
+          disabled={pending || title.trim() === '' || coordsInvalid}
           className="flex-1 rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
         >
           {pending ? 'Saving…' : 'Save'}
