@@ -7,6 +7,8 @@ export type CreateStageInput = Pick<StageRow,
   'ascent_m' | 'descent_m' | 'start_distance_km' | 'end_distance_km' | 'notes'
 >;
 
+export type InsertStageInput = Omit<CreateStageInput, 'order_index'>;
+
 export type UpdateStageInput = Partial<Pick<StageRow,
   'title' | 'order_index' | 'distance_km' | 'ascent_m' | 'descent_m' |
   'start_distance_km' | 'end_distance_km' | 'notes'
@@ -74,6 +76,49 @@ export const stageRepo = {
 
     await db.stages.put({ ...existing, deleted_at: now, updated_at: now, _dirty: 1 });
     await enqueue({ entity: 'stages', op: 'delete', row_id: id, created_at: now });
+  },
+
+  /**
+   * Insert a new stage at `position` (0 = first), shifting all subsequent
+   * stages down. Equivalent to append when position >= current count.
+   */
+  async insertAt(input: InsertStageInput, position: number): Promise<StageRow> {
+    const now = nowIso();
+    let created!: StageRow;
+
+    await db.transaction('rw', [db.stages, db.syncQueue], async () => {
+      const siblings = await db.stages
+        .where('trail_id')
+        .equals(input.trail_id)
+        .filter((s) => s.deleted_at === null)
+        .sortBy('order_index');
+
+      const clampedPos = Math.max(0, Math.min(position, siblings.length));
+
+      const newBase: StageRow = {
+        id: newId(),
+        ...input,
+        order_index: clampedPos,
+        difficulty_score: null,
+        difficulty_class: null,
+        created_at: now,
+        updated_at: now,
+        deleted_at: null,
+        _dirty: 1,
+      };
+      created = withDifficulty(newBase);
+
+      const ordered = [...siblings];
+      ordered.splice(clampedPos, 0, created);
+
+      for (let i = 0; i < ordered.length; i++) {
+        const row = { ...ordered[i], order_index: i, updated_at: now, _dirty: 1 as const };
+        await db.stages.put(row);
+        await db.syncQueue.add({ entity: 'stages', op: 'upsert', row_id: row.id, created_at: now });
+      }
+    });
+
+    return created;
   },
 
   async reorder(trailId: string, orderedIds: string[]): Promise<void> {
