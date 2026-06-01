@@ -74,8 +74,22 @@ export const stageRepo = {
     const existing = await db.stages.get(id);
     if (!existing) return;
 
-    await db.stages.put({ ...existing, deleted_at: now, updated_at: now, _dirty: 1 });
-    await enqueue({ entity: 'stages', op: 'delete', row_id: id, created_at: now });
+    await db.transaction('rw', [db.stages, db.routes, db.weather, db.syncQueue], async () => {
+      const route = await db.routes
+        .where('stage_id')
+        .equals(id)
+        .filter((r) => r.deleted_at === null)
+        .first();
+      if (route) {
+        await db.routes.put({ ...route, deleted_at: now, updated_at: now, _dirty: 1 });
+        await db.syncQueue.add({ entity: 'routes', op: 'delete', row_id: route.id, created_at: now });
+      }
+
+      await db.weather.where('stage_id').equals(id).delete();
+
+      await db.stages.put({ ...existing, deleted_at: now, updated_at: now, _dirty: 1 });
+      await db.syncQueue.add({ entity: 'stages', op: 'delete', row_id: id, created_at: now });
+    });
   },
 
   /**

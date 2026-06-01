@@ -2,8 +2,8 @@
 
 import { useLiveQuery } from 'dexie-react-hooks';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { ArrowLeftIcon, ClockIcon, TrendingUpIcon, MoveHorizontalIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { ArrowLeftIcon, ClockIcon, TrendingUpIcon, MoveHorizontalIcon, ChevronLeftIcon, ChevronRightIcon, Trash2Icon } from 'lucide-react';
 import { stageRepo } from '@/lib/db/repositories/stage.repo';
 import { trailRepo } from '@/lib/db/repositories/trail.repo';
 import { routeRepo } from '@/lib/db/repositories/route.repo';
@@ -26,6 +26,7 @@ import type { MapRoute } from '@/components/map/MapView';
 import { DIFFICULTY_LINE_COLOR, DEFAULT_LINE_COLOR } from '@/components/map/colors';
 import { alertsRepo } from '@/lib/db/repositories/alerts.repo';
 import { WeatherAlertBadge } from '@/components/weather/WeatherAlertBadge';
+import { AlertDialog } from '@/components/ui/alert-dialog';
 
 // MapLibre is browser-only and heavy — code-split it (§11).
 const MapView = dynamic(() => import('@/components/map/MapView').then((m) => m.MapView), {
@@ -119,6 +120,8 @@ export default function StagePage() {
   }, [route, stage?.difficulty_class]);
 
   const [editing, setEditing] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const router = useRouter();
 
   if (trail === undefined || stage === undefined || allStages === undefined) {
     return <LoadingState />;
@@ -282,7 +285,7 @@ export default function StagePage() {
       )}
 
       {/* Prev / Next navigation */}
-      <div className="flex items-center justify-between gap-3 pb-2">
+      <div className="mb-6 flex items-center justify-between gap-3">
         {prevStage ? (
           <Link
             href={`/trails/${trailId}/stages/${prevStage.id}`}
@@ -303,6 +306,31 @@ export default function StagePage() {
           </Link>
         ) : <div className="flex-1" />}
       </div>
+
+      {/* Delete stage */}
+      <div className="border-t pt-6 pb-2">
+        <button
+          onClick={() => setDeleteOpen(true)}
+          className="flex w-full items-center justify-center gap-2 rounded-full border border-destructive/30 py-2.5 text-sm font-medium text-destructive hover:bg-destructive/5"
+        >
+          <Trash2Icon className="h-4 w-4" />
+          Delete stage
+        </button>
+      </div>
+
+      <AlertDialog
+        open={deleteOpen}
+        title="Delete stage?"
+        description={`"${stage.title}" and its route will be permanently deleted.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        destructive
+        onConfirm={async () => {
+          await stageRepo.remove(stageId);
+          router.push(`/trails/${trailId}`);
+        }}
+        onCancel={() => setDeleteOpen(false)}
+      />
     </div>
   );
 }

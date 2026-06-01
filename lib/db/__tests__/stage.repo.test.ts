@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { db } from '../dexie';
 import { trailRepo } from '../repositories/trail.repo';
 import { stageRepo } from '../repositories/stage.repo';
+import { routeRepo } from '../repositories/route.repo';
 
 const USER = 'user-001';
 
@@ -20,6 +21,8 @@ async function makeTrail() {
 beforeEach(async () => {
   await db.trails.clear();
   await db.stages.clear();
+  await db.routes.clear();
+  await db.weather.clear();
   await db.syncQueue.clear();
 });
 
@@ -134,6 +137,48 @@ describe('stageRepo.insertAt', () => {
 
     expect(inserted.difficulty_class).not.toBeNull();
     expect(inserted.difficulty_score).toBeGreaterThan(0);
+  });
+});
+
+describe('stageRepo.remove', () => {
+  it('soft-deletes the stage', async () => {
+    const trail = await makeTrail();
+    const stage = await stageRepo.create({
+      trail_id: trail.id, user_id: USER, title: 'Day 1', order_index: 0,
+      distance_km: 15, ascent_m: 300, descent_m: 200,
+      start_distance_km: null, end_distance_km: null, notes: null,
+    });
+
+    await stageRepo.remove(stage.id);
+
+    const row = await db.stages.get(stage.id);
+    expect(row!.deleted_at).not.toBeNull();
+    expect(await stageRepo.findById(stage.id)).toBeUndefined();
+  });
+
+  it('cascade soft-deletes the stage route', async () => {
+    const trail = await makeTrail();
+    const stage = await stageRepo.create({
+      trail_id: trail.id, user_id: USER, title: 'Day 1', order_index: 0,
+      distance_km: 15, ascent_m: 300, descent_m: 200,
+      start_distance_km: null, end_distance_km: null, notes: null,
+    });
+    await routeRepo.upsert({
+      trail_id: trail.id, user_id: USER, stage_id: stage.id,
+      geojson: { type: 'LineString', coordinates: [[0, 0], [1, 1]] },
+      total_distance_km: 15, total_ascent_m: 300, total_descent_m: 200,
+      elevation_profile: [], source: 'manual',
+    });
+
+    await db.syncQueue.clear();
+    await stageRepo.remove(stage.id);
+
+    const routes = await db.routes.where('stage_id').equals(stage.id).toArray();
+    expect(routes.every((r) => r.deleted_at !== null)).toBe(true);
+
+    const ops = await db.syncQueue.toArray();
+    expect(ops.some((o) => o.entity === 'routes' && o.op === 'delete')).toBe(true);
+    expect(ops.some((o) => o.entity === 'stages' && o.op === 'delete')).toBe(true);
   });
 });
 
