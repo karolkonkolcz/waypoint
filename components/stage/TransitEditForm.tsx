@@ -1,10 +1,20 @@
 'use client';
 
-import { useState } from 'react';
-import { PlusIcon, Trash2Icon, ChevronUpIcon, ChevronDownIcon } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import {
+  PlusIcon,
+  Trash2Icon,
+  ChevronUpIcon,
+  ChevronDownIcon,
+  MapPinIcon,
+  SearchIcon,
+  Loader2Icon,
+  XIcon,
+} from 'lucide-react';
 import { stageRepo } from '@/lib/db/repositories/stage.repo';
 import { newId } from '@/lib/db/repositories/base';
 import type { StageRow, Milestone, MilestoneKind } from '@/lib/db/dexie';
+import { searchPlaces, formatPlace, type GeocodeResult } from '@/lib/weather/geocoding';
 import { MILESTONE_KINDS, MILESTONE_META } from './StageTimeline';
 
 function blankMilestone(): Milestone {
@@ -19,6 +29,62 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
   const [lat, setLat] = useState(stage.location_lat?.toString() ?? '');
   const [lon, setLon] = useState(stage.location_lon?.toString() ?? '');
   const [items, setItems] = useState<Milestone[]>(stage.timeline);
+
+  // Place search (Open-Meteo geocoding).
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<GeocodeResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [showManual, setShowManual] = useState(false);
+  const skipSearch = useRef(false);
+
+  const hasAnchor = lat.trim() !== '' && lon.trim() !== '';
+
+  // Debounced search: refetch ~300ms after typing stops; abort stale requests.
+  useEffect(() => {
+    if (skipSearch.current) {
+      skipSearch.current = false;
+      return;
+    }
+    const q = query.trim();
+    if (q.length < 2) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+    const ctrl = new AbortController();
+    setSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        setResults(await searchPlaces(q, ctrl.signal));
+      } catch (err) {
+        if (!(err instanceof DOMException && err.name === 'AbortError')) setResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => {
+      clearTimeout(timer);
+      ctrl.abort();
+    };
+  }, [query]);
+
+  function selectPlace(r: GeocodeResult) {
+    skipSearch.current = true;
+    setLocationName(r.name);
+    setLat(r.latitude.toFixed(4));
+    setLon(r.longitude.toFixed(4));
+    setQuery('');
+    setResults([]);
+  }
+
+  function clearAnchor() {
+    setLocationName('');
+    setLat('');
+    setLon('');
+    setQuery('');
+    setResults([]);
+    setShowManual(false);
+  }
 
   function patch(id: string, change: Partial<Milestone>) {
     setItems((prev) => prev.map((m) => (m.id === id ? { ...m, ...change } : m)));
@@ -193,41 +259,108 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
         )}
       </div>
 
-      {/* Weather anchor */}
+      {/* Weather anchor — search a place, coordinates fill in automatically. */}
       <div className="space-y-2">
         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Weather location
         </span>
-        <input
-          value={locationName}
-          onChange={(e) => setLocationName(e.target.value)}
-          placeholder="Place name (e.g. Bastia)"
-          className="input"
-        />
-        <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Latitude</label>
-            <input
-              value={lat}
-              onChange={(e) => setLat(e.target.value)}
-              inputMode="decimal"
-              placeholder="42.7028"
-              className="input"
-            />
+
+        {hasAnchor ? (
+          <div className="flex items-center gap-2 rounded-xl border bg-background px-3 py-2.5">
+            <MapPinIcon className="h-4 w-4 shrink-0 text-primary" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">
+                {locationName.trim() || 'Custom location'}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {lat}, {lon}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={clearAnchor}
+              aria-label="Clear weather location"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full hover:bg-muted"
+            >
+              <XIcon className="h-4 w-4" />
+            </button>
           </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Longitude</label>
+        ) : (
+          <div className="relative">
+            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
-              value={lon}
-              onChange={(e) => setLon(e.target.value)}
-              inputMode="decimal"
-              placeholder="9.4503"
-              className="input"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search a place (e.g. Bastia)"
+              className="input pl-9"
+              autoComplete="off"
             />
+            {searching && (
+              <Loader2Icon className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+            )}
+            {results.length > 0 && (
+              <ul className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-xl border bg-card py-1 shadow-lg">
+                {results.map((r) => (
+                  <li key={r.id}>
+                    <button
+                      type="button"
+                      onClick={() => selectPlace(r)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
+                    >
+                      <MapPinIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{formatPlace(r)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-        </div>
+        )}
+
+        {!hasAnchor && query.trim().length >= 2 && !searching && results.length === 0 && (
+          <p className="text-xs text-muted-foreground">No places found for “{query.trim()}”.</p>
+        )}
+
+        {!hasAnchor && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowManual((v) => !v)}
+              className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+            >
+              {showManual ? 'Hide manual entry' : 'Enter coordinates manually'}
+            </button>
+            {showManual && (
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Latitude</label>
+                  <input
+                    value={lat}
+                    onChange={(e) => setLat(e.target.value)}
+                    inputMode="decimal"
+                    placeholder="42.7028"
+                    className="input"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Longitude</label>
+                  <input
+                    value={lon}
+                    onChange={(e) => setLon(e.target.value)}
+                    inputMode="decimal"
+                    placeholder="9.4503"
+                    className="input"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         <p className="text-xs text-muted-foreground">
-          Set coordinates to show a forecast for this day.
+          {hasAnchor
+            ? 'Forecast will be shown for this day.'
+            : 'Search a place to show a forecast for this day.'}
         </p>
       </div>
 
