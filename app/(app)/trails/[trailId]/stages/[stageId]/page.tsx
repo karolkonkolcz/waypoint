@@ -14,6 +14,7 @@ import { fetchOpenMeteo } from '@/lib/weather/openmeteo';
 import { buildSnapshot } from '@/lib/weather/forecast';
 import type { WeatherSnapshot } from '@/lib/weather/forecast';
 import { pointAtDistance } from '@/lib/domain/geo';
+import { stageDate } from '@/lib/domain/stageDate';
 import { StageHeader } from '@/components/stage/StageHeader';
 import { StageStats } from '@/components/stage/StageStats';
 import { StageTimeline } from '@/components/stage/StageTimeline';
@@ -66,16 +67,12 @@ export default function StagePage() {
   }, [stage?.stage_type, stage?.location_lat, stage?.location_lon, route?.id, route?.total_distance_km]);
 
   useEffect(() => {
-    if (!stage || !trail || !weatherPoint || !allStages) return;
-    if (!trail.start_date) return;
+    if (!stage || !trail || !weatherPoint) return;
     if (cachedWeather !== undefined && weatherRepo.isFresh(cachedWeather)) return;
 
-    const idx = allStages.findIndex((s) => s.id === stageId);
-    if (idx < 0) return;
-
-    const d = new Date(trail.start_date + 'T00:00:00');
-    d.setDate(d.getDate() + idx);
-    const targetDate = d.toISOString().split('T')[0];
+    // Explicit per-stage date wins; otherwise derive from the trail schedule.
+    const targetDate = stageDate(stage, trail.start_date);
+    if (!targetDate) return;
 
     // Open-Meteo only forecasts 16 days ahead
     const todayStart = new Date();
@@ -105,8 +102,9 @@ export default function StagePage() {
     stageId,
     trail?.id,
     trail?.start_date,
+    stage?.date,
+    stage?.order_index,
     weatherPoint,
-    allStages,
     cachedWeather?.fetched_at,
   ]);
 
@@ -166,6 +164,7 @@ export default function StagePage() {
   const trekDayNumber = allStages
     .slice(0, stageIndex + 1)
     .filter((s) => s.stage_type !== 'transit').length;
+  const stageCalendarDate = stageDate(stage, trail.start_date);
 
   const stats = [
     { label: 'Distance', value: `${stage.distance_km} km`, icon: '↔' },
@@ -191,6 +190,7 @@ export default function StagePage() {
         <StageHeader
           title={stage.title}
           dayNumber={trekDayNumber}
+          date={stageCalendarDate}
           difficultyClass={stage.difficulty_class as DifficultyClass | null}
           difficultyScore={stage.difficulty_score}
           stageType={stage.stage_type}
@@ -411,6 +411,7 @@ function EditStageForm({
     const fd = new FormData(e.currentTarget);
     await stageRepo.update(stage.id, {
       title: (fd.get('title') as string).trim(),
+      date: (fd.get('date') as string) || null,
       distance_km: parseFloat(fd.get('distance_km') as string),
       ascent_m: parseInt(fd.get('ascent_m') as string, 10),
       descent_m: parseInt(fd.get('descent_m') as string, 10),
@@ -431,6 +432,11 @@ function EditStageForm({
         placeholder="Stage title"
         className="input"
       />
+      <div className="space-y-1">
+        <label className="text-xs text-muted-foreground">Date</label>
+        <input name="date" type="date" defaultValue={stage.date ?? ''} className="input" />
+        <p className="text-xs text-muted-foreground">Leave empty to follow the trail start date.</p>
+      </div>
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">Distance (km)</label>

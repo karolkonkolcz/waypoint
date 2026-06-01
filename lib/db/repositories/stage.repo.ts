@@ -7,6 +7,7 @@ import { newId, nowIso, enqueue } from './base';
 // import, new-trail form, insert UI) need no changes.
 export type CreateStageInput = Pick<StageRow, 'trail_id' | 'user_id' | 'title' | 'order_index'> & {
   stage_type?: StageType;
+  date?: string | null;
   distance_km?: number;
   ascent_m?: number;
   descent_m?: number;
@@ -22,7 +23,7 @@ export type CreateStageInput = Pick<StageRow, 'trail_id' | 'user_id' | 'title' |
 export type InsertStageInput = Omit<CreateStageInput, 'order_index'>;
 
 export type UpdateStageInput = Partial<Pick<StageRow,
-  'title' | 'order_index' | 'distance_km' | 'ascent_m' | 'descent_m' |
+  'title' | 'order_index' | 'date' | 'distance_km' | 'ascent_m' | 'descent_m' |
   'start_distance_km' | 'end_distance_km' | 'notes' |
   'timeline' | 'location_lat' | 'location_lon' | 'location_name'
 >>;
@@ -54,6 +55,7 @@ function normalize(
     trail_id: input.trail_id,
     user_id: input.user_id,
     title: input.title,
+    date: input.date ?? null,
     stage_type,
     distance_km: isTransit ? 0 : input.distance_km ?? 0,
     ascent_m: isTransit ? 0 : input.ascent_m ?? 0,
@@ -135,6 +137,21 @@ export const stageRepo = {
 
       await db.stages.put({ ...existing, deleted_at: now, updated_at: now, _dirty: 1 });
       await db.syncQueue.add({ entity: 'stages', op: 'delete', row_id: id, created_at: now });
+
+      // Close the gap: re-pack the surviving siblings into contiguous 0..n so the
+      // derived per-stage date (trail start + order_index) stays consecutive.
+      const survivors = await db.stages
+        .where('trail_id')
+        .equals(existing.trail_id)
+        .filter((s) => s.deleted_at === null)
+        .sortBy('order_index');
+
+      for (let i = 0; i < survivors.length; i++) {
+        if (survivors[i].order_index === i) continue;
+        const row = { ...survivors[i], order_index: i, updated_at: now, _dirty: 1 as const };
+        await db.stages.put(row);
+        await db.syncQueue.add({ entity: 'stages', op: 'upsert', row_id: row.id, created_at: now });
+      }
     });
   },
 

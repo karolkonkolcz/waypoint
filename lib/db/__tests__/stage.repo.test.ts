@@ -255,6 +255,32 @@ describe('stageRepo.remove', () => {
     expect(ops.some((o) => o.entity === 'routes' && o.op === 'delete')).toBe(true);
     expect(ops.some((o) => o.entity === 'stages' && o.op === 'delete')).toBe(true);
   });
+
+  it('re-packs surviving siblings into contiguous order_index', async () => {
+    const trail = await makeTrail();
+    const make = (i: number) => stageRepo.create({
+      trail_id: trail.id, user_id: USER, title: `Day ${i}`, order_index: i,
+      distance_km: 15, ascent_m: 300, descent_m: 200,
+      start_distance_km: null, end_distance_km: null, notes: null,
+    });
+    const s0 = await make(0);
+    const s1 = await make(1);
+    const s2 = await make(2);
+    const s3 = await make(3);
+    await db.syncQueue.clear();
+
+    await stageRepo.remove(s1.id);
+
+    const all = await stageRepo.findByTrail(trail.id);
+    expect(all.map((s) => s.id)).toEqual([s0.id, s2.id, s3.id]);
+    all.forEach((s, i) => expect(s.order_index).toBe(i));
+
+    // Only the shifted survivors (s2, s3) get re-synced; the untouched s0 does not.
+    const upserts = await db.syncQueue
+      .filter((o) => o.entity === 'stages' && o.op === 'upsert')
+      .toArray();
+    expect(upserts.map((o) => o.row_id).sort()).toEqual([s2.id, s3.id].sort());
+  });
 });
 
 describe('stageRepo.reorder', () => {

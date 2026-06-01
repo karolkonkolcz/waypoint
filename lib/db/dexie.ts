@@ -61,6 +61,8 @@ export interface StageRow extends Sync {
   user_id: string;
   title: string;
   order_index: number;
+  // Explicit calendar date (YYYY-MM-DD). null = derive from trail.start_date + order_index.
+  date: string | null;
   // 'trek' = hiking day (metrics/route/weather). 'transit' = technical day (timeline).
   stage_type: StageType;
   distance_km: number;
@@ -179,6 +181,18 @@ class WaypointDB extends Dexie {
             if (s.location_name === undefined) s.location_name = null;
           }),
       );
+
+    // v5: per-stage override date. Backfill existing rows to null (= derive from
+    // trail.start_date + order_index, the prior behaviour). No index needed —
+    // dates are read with the already-loaded stage, never queried on directly.
+    this.version(5).upgrade((tx) =>
+      tx
+        .table<StageRow>('stages')
+        .toCollection()
+        .modify((s) => {
+          if (s.date === undefined) s.date = null;
+        }),
+    );
   }
 }
 

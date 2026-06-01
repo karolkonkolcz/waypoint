@@ -41,6 +41,7 @@ function parseCoord(raw: string, max: number): number | null {
 export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: () => void }) {
   const [pending, setPending] = useState(false);
   const [title, setTitle] = useState(stage.title);
+  const [date, setDate] = useState(stage.date ?? '');
   const [notes, setNotes] = useState(stage.notes ?? '');
   const [locationName, setLocationName] = useState(stage.location_name ?? '');
   const [lat, setLat] = useState(stage.location_lat?.toString() ?? '');
@@ -191,6 +192,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
 
       await stageRepo.update(stage.id, {
         title: title.trim(),
+        date: date || null,
         notes: notes.trim() || null,
         timeline,
         location_name: locationName.trim() || null,
@@ -216,6 +218,17 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
           placeholder="e.g. Arrival in Bastia"
           className="input"
         />
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="text-xs text-muted-foreground">Date</label>
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="input"
+        />
+        <p className="text-xs text-muted-foreground">Leave empty to follow the trail start date.</p>
       </div>
 
       {/* Timeline editor */}

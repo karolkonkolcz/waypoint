@@ -22,6 +22,7 @@ import { AlertDialog } from '@/components/ui/alert-dialog';
 import type { DifficultyClass } from '@/lib/domain/difficulty';
 import { naismithHours } from '@/lib/domain/eta';
 import { sortMilestones } from '@/components/stage/StageTimeline';
+import { stageDate, formatStageDate } from '@/lib/domain/stageDate';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import type { TrailRow, Milestone, StageType } from '@/lib/db/dexie';
@@ -151,38 +152,43 @@ export default function TrailPage() {
           {/* Insert point before first stage */}
           <InsertPoint trailId={trailId} userId={trail.user_id} position={0} />
 
-          {stages.map((stage, idx) => (
-            <div key={stage.id}>
-              <Link
-                href={`/trails/${trailId}/stages/${stage.id}`}
-                className="flex items-center gap-3 rounded-2xl border bg-card px-4 py-3 shadow-sm hover:bg-accent active:scale-[0.99]"
-              >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold">
-                  {stage.stage_type === 'transit' ? (
-                    <ArrowRightLeftIcon className="h-4 w-4" />
-                  ) : (
-                    // Number only trek days — transit days don't count.
-                    stages.slice(0, idx + 1).filter((s) => s.stage_type !== 'transit').length
+          {stages.map((stage, idx) => {
+            const cd = stageDate(stage, trail.start_date);
+            const summary =
+              stage.stage_type === 'transit'
+                ? transitSummary(stage.timeline)
+                : `${stage.distance_km} km · ↑${stage.ascent_m} m · ↓${stage.descent_m} m`;
+            return (
+              <div key={stage.id}>
+                <Link
+                  href={`/trails/${trailId}/stages/${stage.id}`}
+                  className="flex items-center gap-3 rounded-2xl border bg-card px-4 py-3 shadow-sm hover:bg-accent active:scale-[0.99]"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold">
+                    {stage.stage_type === 'transit' ? (
+                      <ArrowRightLeftIcon className="h-4 w-4" />
+                    ) : (
+                      // Number only trek days — transit days don't count.
+                      stages.slice(0, idx + 1).filter((s) => s.stage_type !== 'transit').length
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{stage.title}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {cd ? `${formatStageDate(cd)} · ${summary}` : summary}
+                    </p>
+                  </div>
+                  {stage.difficulty_class && (
+                    <DifficultyBadge klass={stage.difficulty_class as DifficultyClass} size="sm" />
                   )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{stage.title}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {stage.stage_type === 'transit'
-                      ? transitSummary(stage.timeline)
-                      : `${stage.distance_km} km · ↑${stage.ascent_m} m · ↓${stage.descent_m} m`}
-                  </p>
-                </div>
-                {stage.difficulty_class && (
-                  <DifficultyBadge klass={stage.difficulty_class as DifficultyClass} size="sm" />
-                )}
-                <ChevronRightIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-              </Link>
+                  <ChevronRightIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </Link>
 
-              {/* Insert point after each stage */}
-              <InsertPoint trailId={trailId} userId={trail.user_id} position={idx + 1} />
-            </div>
-          ))}
+                {/* Insert point after each stage */}
+                <InsertPoint trailId={trailId} userId={trail.user_id} position={idx + 1} />
+              </div>
+            );
+          })}
         </div>
       )}
 

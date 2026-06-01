@@ -98,6 +98,7 @@ export type Database = {
         Row: {
           ascent_m: number
           created_at: string
+          date: string | null
           deleted_at: string | null
           descent_m: number
           difficulty_class: string | null
@@ -121,6 +122,7 @@ export type Database = {
         Insert: {
           ascent_m?: number
           created_at?: string
+          date?: string | null
           deleted_at?: string | null
           descent_m?: number
           difficulty_class?: string | null
@@ -144,6 +146,7 @@ export type Database = {
         Update: {
           ascent_m?: number
           created_at?: string
+          date?: string | null
           deleted_at?: string | null
           descent_m?: number
           difficulty_class?: string | null

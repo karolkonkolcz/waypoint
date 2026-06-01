@@ -27,6 +27,7 @@ const stageBase = {
   trail_id: z.string().uuid(),
   title: z.string().min(1).max(200),
   order_index: z.number().int().nonnegative(),
+  date: z.string().nullable(),
   notes: z.string().nullable(),
 };
 
