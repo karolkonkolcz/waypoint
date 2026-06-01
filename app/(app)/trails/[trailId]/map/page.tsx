@@ -61,7 +61,7 @@ export default function TrailMapPage() {
             No route geometry to show yet.
           </div>
         ) : (
-          <MapView routes={mapRoutes} className="absolute inset-0" />
+          <MapView routes={mapRoutes} className="h-full w-full" />
         )}
       </div>
     </div>
