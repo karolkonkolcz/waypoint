@@ -33,12 +33,36 @@ export interface RouteRow extends Sync {
   source: 'gpx' | 'manual';
 }
 
+export type StageType = 'trek' | 'transit';
+
+export type MilestoneKind =
+  | 'bus'
+  | 'train'
+  | 'flight'
+  | 'transfer'
+  | 'checkin'
+  | 'meal'
+  | 'note';
+
+// One entry on a transit day's timeline. Stored as a JSON array on the stage —
+// always loaded and edited together with the day, so it needs no own table.
+export interface Milestone {
+  id: string; // local UUID, used for React keys + reorder
+  time: string | null; // "HH:MM" local, null = unscheduled
+  title: string;
+  kind: MilestoneKind;
+  location: string | null;
+  notes: string | null;
+}
+
 export interface StageRow extends Sync {
   id: string;
   trail_id: string;
   user_id: string;
   title: string;
   order_index: number;
+  // 'trek' = hiking day (metrics/route/weather). 'transit' = technical day (timeline).
+  stage_type: StageType;
   distance_km: number;
   ascent_m: number;
   descent_m: number;
@@ -47,6 +71,11 @@ export interface StageRow extends Sync {
   difficulty_score: number | null;
   difficulty_class: string | null;
   notes: string | null;
+  // Transit-day timeline + optional weather anchor (transit has no route midpoint).
+  timeline: Milestone[];
+  location_lat: number | null;
+  location_lon: number | null;
+  location_name: string | null;
 }
 
 export interface WaypointRow extends Sync {
@@ -130,6 +159,26 @@ class WaypointDB extends Dexie {
     this.version(3).stores({
       alerts: 'trail_id, fetched_at',
     });
+
+    // v4: stage_type + transit-day timeline. Backfill existing rows to 'trek'
+    // with an empty timeline and no location anchor. Index stage_type for
+    // type-filtered queries.
+    this.version(4)
+      .stores({
+        stages: 'id, trail_id, order_index, stage_type, _dirty',
+      })
+      .upgrade((tx) =>
+        tx
+          .table<StageRow>('stages')
+          .toCollection()
+          .modify((s) => {
+            if (s.stage_type === undefined) s.stage_type = 'trek';
+            if (s.timeline === undefined) s.timeline = [];
+            if (s.location_lat === undefined) s.location_lat = null;
+            if (s.location_lon === undefined) s.location_lon = null;
+            if (s.location_name === undefined) s.location_name = null;
+          }),
+      );
   }
 }
 

@@ -12,6 +12,8 @@ import {
   MapIcon,
   PencilIcon,
   Trash2Icon,
+  ArrowRightLeftIcon,
+  FootprintsIcon,
 } from 'lucide-react';
 import { trailRepo } from '@/lib/db/repositories/trail.repo';
 import { stageRepo } from '@/lib/db/repositories/stage.repo';
@@ -19,9 +21,22 @@ import { DifficultyBadge } from '@/components/difficulty/DifficultyBadge';
 import { AlertDialog } from '@/components/ui/alert-dialog';
 import type { DifficultyClass } from '@/lib/domain/difficulty';
 import { naismithHours } from '@/lib/domain/eta';
+import { sortMilestones } from '@/components/stage/StageTimeline';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
-import type { TrailRow } from '@/lib/db/dexie';
+import type { TrailRow, Milestone, StageType } from '@/lib/db/dexie';
+
+/** One-line summary of a transit day's timeline for the stage list. */
+function transitSummary(timeline: Milestone[]): string {
+  if (timeline.length === 0) return 'Transit day · no milestones';
+  const timed = sortMilestones(timeline).filter((m) => m.time !== null);
+  const count = timeline.length;
+  const noun = count === 1 ? 'milestone' : 'milestones';
+  if (timed.length === 0) return `Transit day · ${count} ${noun}`;
+  const span =
+    timed.length > 1 ? `${timed[0].time}–${timed[timed.length - 1].time}` : timed[0].time;
+  return `${span} · ${count} ${noun}`;
+}
 
 const PACE_PRESETS = [
   { label: 'Leisurely', kmh: 3, hint: 'Heavy pack or rough terrain' },
@@ -143,12 +158,18 @@ export default function TrailPage() {
                 className="flex items-center gap-3 rounded-2xl border bg-card px-4 py-3 shadow-sm hover:bg-accent active:scale-[0.99]"
               >
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold">
-                  {idx + 1}
+                  {stage.stage_type === 'transit' ? (
+                    <ArrowRightLeftIcon className="h-4 w-4" />
+                  ) : (
+                    idx + 1
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{stage.title}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {stage.distance_km} km · ↑{stage.ascent_m} m · ↓{stage.descent_m} m
+                    {stage.stage_type === 'transit'
+                      ? transitSummary(stage.timeline)
+                      : `${stage.distance_km} km · ↑${stage.ascent_m} m · ↓${stage.descent_m} m`}
                   </p>
                 </div>
                 {stage.difficulty_class && (
@@ -213,36 +234,75 @@ function InsertStageButton({
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
+  const [open, setOpen] = useState(false);
 
-  async function handleInsert() {
+  async function handleInsert(stageType: StageType) {
     setPending(true);
     try {
-      const stage = await stageRepo.insertAt(
-        {
-          trail_id: trailId,
-          user_id: userId,
-          title: `Day ${position + 1}`,
-          distance_km: 20,
-          ascent_m: 500,
-          descent_m: 500,
-          start_distance_km: null,
-          end_distance_km: null,
-          notes: null,
-        },
-        position,
-      );
+      const input =
+        stageType === 'transit'
+          ? {
+              trail_id: trailId,
+              user_id: userId,
+              title: 'Travel day',
+              stage_type: 'transit' as const,
+              notes: null,
+            }
+          : {
+              trail_id: trailId,
+              user_id: userId,
+              title: `Day ${position + 1}`,
+              distance_km: 20,
+              ascent_m: 500,
+              descent_m: 500,
+              start_distance_km: null,
+              end_distance_km: null,
+              notes: null,
+            };
+      const stage = await stageRepo.insertAt(input, position);
       router.push(`/trails/${trailId}/stages/${stage.id}`);
     } finally {
       setPending(false);
     }
   }
 
-  if (label !== null) {
-    return (
+  const choices = (
+    <div className="flex items-center gap-2">
       <button
-        onClick={handleInsert}
+        onClick={() => handleInsert('trek')}
         disabled={pending}
         className="flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+      >
+        <FootprintsIcon className="h-3.5 w-3.5" />
+        Trek day
+      </button>
+      <button
+        onClick={() => handleInsert('transit')}
+        disabled={pending}
+        className="flex items-center gap-1.5 rounded-full border border-primary px-3 py-1.5 text-xs font-semibold text-primary disabled:opacity-50"
+      >
+        <ArrowRightLeftIcon className="h-3.5 w-3.5" />
+        Transit day
+      </button>
+      <button
+        onClick={() => setOpen(false)}
+        disabled={pending}
+        aria-label="Cancel"
+        className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+      >
+        Cancel
+      </button>
+    </div>
+  );
+
+  // Labelled trigger (top of the Stages section).
+  if (label !== null) {
+    return open ? (
+      choices
+    ) : (
+      <button
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
       >
         <PlusIcon className="h-3.5 w-3.5" />
         {label}
@@ -250,17 +310,21 @@ function InsertStageButton({
     );
   }
 
+  // Inline insert point between stages.
   return (
-    <div className="flex items-center gap-2 py-0.5">
+    <div className="flex items-center justify-center gap-2 py-0.5">
       <div className="h-px flex-1 bg-border" />
-      <button
-        onClick={handleInsert}
-        disabled={pending}
-        aria-label={`Insert stage at position ${position + 1}`}
-        className="flex h-6 w-6 items-center justify-center rounded-full border bg-background text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-50"
-      >
-        <PlusIcon className="h-3 w-3" />
-      </button>
+      {open ? (
+        choices
+      ) : (
+        <button
+          onClick={() => setOpen(true)}
+          aria-label={`Insert stage at position ${position + 1}`}
+          className="flex h-6 w-6 items-center justify-center rounded-full border bg-background text-muted-foreground hover:border-primary hover:text-primary"
+        >
+          <PlusIcon className="h-3 w-3" />
+        </button>
+      )}
       <div className="h-px flex-1 bg-border" />
     </div>
   );

@@ -1,22 +1,41 @@
-import { db, type StageRow } from '../dexie';
+import { db, type StageRow, type StageType, type Milestone } from '../dexie';
 import { scoreDifficulty } from '@/lib/domain/difficulty';
 import { newId, nowIso, enqueue } from './base';
 
-export type CreateStageInput = Pick<StageRow,
-  'trail_id' | 'user_id' | 'title' | 'order_index' | 'distance_km' |
-  'ascent_m' | 'descent_m' | 'start_distance_km' | 'end_distance_km' | 'notes'
->;
+// Trek-specific fields are optional in the input; transit stages omit them and
+// get zeroed metrics. stage_type defaults to 'trek' so existing callers (GPX
+// import, new-trail form, insert UI) need no changes.
+export type CreateStageInput = Pick<StageRow, 'trail_id' | 'user_id' | 'title' | 'order_index'> & {
+  stage_type?: StageType;
+  distance_km?: number;
+  ascent_m?: number;
+  descent_m?: number;
+  start_distance_km?: number | null;
+  end_distance_km?: number | null;
+  notes?: string | null;
+  timeline?: Milestone[];
+  location_lat?: number | null;
+  location_lon?: number | null;
+  location_name?: string | null;
+};
 
 export type InsertStageInput = Omit<CreateStageInput, 'order_index'>;
 
 export type UpdateStageInput = Partial<Pick<StageRow,
   'title' | 'order_index' | 'distance_km' | 'ascent_m' | 'descent_m' |
-  'start_distance_km' | 'end_distance_km' | 'notes'
+  'start_distance_km' | 'end_distance_km' | 'notes' |
+  'timeline' | 'location_lat' | 'location_lon' | 'location_name'
 >>;
 
-function withDifficulty<T extends Pick<StageRow, 'distance_km' | 'ascent_m' | 'descent_m'>>(
+const DIFFICULTY = ['difficulty_score', 'difficulty_class'] as const;
+
+/** Difficulty is meaningful only for trek days; transit days carry null. */
+function withDifficulty<T extends Pick<StageRow, 'stage_type' | 'distance_km' | 'ascent_m' | 'descent_m'>>(
   row: T,
 ): T & Pick<StageRow, 'difficulty_score' | 'difficulty_class'> {
+  if (row.stage_type === 'transit') {
+    return { ...row, difficulty_score: null, difficulty_class: null };
+  }
   const { score, klass } = scoreDifficulty({
     distanceKm: row.distance_km,
     ascentM: row.ascent_m,
@@ -24,6 +43,32 @@ function withDifficulty<T extends Pick<StageRow, 'distance_km' | 'ascent_m' | 'd
   });
   return { ...row, difficulty_score: score, difficulty_class: klass };
 }
+
+/** Fill defaults so both trek and transit inputs become a complete StageRow body. */
+function normalize(
+  input: CreateStageInput | InsertStageInput,
+): Omit<StageRow, 'id' | 'order_index' | typeof DIFFICULTY[number] | keyof Sync> {
+  const stage_type = input.stage_type ?? 'trek';
+  const isTransit = stage_type === 'transit';
+  return {
+    trail_id: input.trail_id,
+    user_id: input.user_id,
+    title: input.title,
+    stage_type,
+    distance_km: isTransit ? 0 : input.distance_km ?? 0,
+    ascent_m: isTransit ? 0 : input.ascent_m ?? 0,
+    descent_m: isTransit ? 0 : input.descent_m ?? 0,
+    start_distance_km: isTransit ? null : input.start_distance_km ?? null,
+    end_distance_km: isTransit ? null : input.end_distance_km ?? null,
+    notes: input.notes ?? null,
+    timeline: input.timeline ?? [],
+    location_lat: input.location_lat ?? null,
+    location_lon: input.location_lon ?? null,
+    location_name: input.location_name ?? null,
+  };
+}
+
+type Sync = { created_at: string; updated_at: string; deleted_at: string | null; _dirty: 0 | 1 };
 
 export const stageRepo = {
   async findByTrail(trailId: string): Promise<StageRow[]> {
@@ -43,7 +88,8 @@ export const stageRepo = {
     const now = nowIso();
     const base: StageRow = {
       id: newId(),
-      ...input,
+      ...normalize(input),
+      order_index: input.order_index,
       difficulty_score: null,
       difficulty_class: null,
       created_at: now,
@@ -111,7 +157,7 @@ export const stageRepo = {
 
       const newBase: StageRow = {
         id: newId(),
-        ...input,
+        ...normalize(input),
         order_index: clampedPos,
         difficulty_score: null,
         difficulty_class: null,

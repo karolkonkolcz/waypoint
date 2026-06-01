@@ -140,6 +140,81 @@ describe('stageRepo.insertAt', () => {
   });
 });
 
+describe('transit stages', () => {
+  it('create zeroes metrics and leaves difficulty null', async () => {
+    const trail = await makeTrail();
+    const stage = await stageRepo.create({
+      trail_id: trail.id,
+      user_id: USER,
+      title: 'Arrival day',
+      order_index: 0,
+      stage_type: 'transit',
+    });
+
+    expect(stage.stage_type).toBe('transit');
+    expect(stage.distance_km).toBe(0);
+    expect(stage.ascent_m).toBe(0);
+    expect(stage.descent_m).toBe(0);
+    expect(stage.difficulty_score).toBeNull();
+    expect(stage.difficulty_class).toBeNull();
+    expect(stage.timeline).toEqual([]);
+    expect(stage.location_lat).toBeNull();
+  });
+
+  it('defaults stage_type to trek so existing callers are unchanged', async () => {
+    const trail = await makeTrail();
+    const stage = await stageRepo.create({
+      trail_id: trail.id, user_id: USER, title: 'Day 1', order_index: 0,
+      distance_km: 20, ascent_m: 800, descent_m: 400,
+      start_distance_km: null, end_distance_km: null, notes: null,
+    });
+    expect(stage.stage_type).toBe('trek');
+    expect(stage.difficulty_class).not.toBeNull();
+  });
+
+  it('insertAt supports transit days alongside trek days', async () => {
+    const trail = await makeTrail();
+    const trek = await stageRepo.create({
+      trail_id: trail.id, user_id: USER, title: 'Day 1', order_index: 0,
+      distance_km: 20, ascent_m: 800, descent_m: 400,
+      start_distance_km: null, end_distance_km: null, notes: null,
+    });
+
+    const transit = await stageRepo.insertAt(
+      { trail_id: trail.id, user_id: USER, title: 'Travel day', stage_type: 'transit', notes: null },
+      0,
+    );
+
+    const all = await stageRepo.findByTrail(trail.id);
+    expect(all.map((s) => s.id)).toEqual([transit.id, trek.id]);
+    expect(all[0].stage_type).toBe('transit');
+    expect(all[0].distance_km).toBe(0);
+  });
+
+  it('update persists timeline + location anchor', async () => {
+    const trail = await makeTrail();
+    const stage = await stageRepo.create({
+      trail_id: trail.id, user_id: USER, title: 'Arrival', order_index: 0,
+      stage_type: 'transit',
+    });
+
+    const updated = await stageRepo.update(stage.id, {
+      timeline: [
+        { id: 'm1', time: '08:00', title: 'Bus to airport', kind: 'bus', location: null, notes: null },
+      ],
+      location_lat: 42.7028,
+      location_lon: 9.4503,
+      location_name: 'Bastia',
+    });
+
+    expect(updated.timeline).toHaveLength(1);
+    expect(updated.timeline[0].title).toBe('Bus to airport');
+    expect(updated.location_name).toBe('Bastia');
+    // Difficulty stays null for transit even after update.
+    expect(updated.difficulty_class).toBeNull();
+  });
+});
+
 describe('stageRepo.remove', () => {
   it('soft-deletes the stage', async () => {
     const trail = await makeTrail();

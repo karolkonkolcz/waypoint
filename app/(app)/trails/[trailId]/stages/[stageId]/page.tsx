@@ -3,7 +3,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeftIcon, ClockIcon, TrendingUpIcon, MoveHorizontalIcon, ChevronLeftIcon, ChevronRightIcon, Trash2Icon } from 'lucide-react';
+import { ArrowLeftIcon, ClockIcon, TrendingUpIcon, MoveHorizontalIcon, ChevronLeftIcon, ChevronRightIcon, Trash2Icon, MapPinIcon } from 'lucide-react';
 import { stageRepo } from '@/lib/db/repositories/stage.repo';
 import { trailRepo } from '@/lib/db/repositories/trail.repo';
 import { routeRepo } from '@/lib/db/repositories/route.repo';
@@ -16,6 +16,8 @@ import type { WeatherSnapshot } from '@/lib/weather/forecast';
 import { pointAtDistance } from '@/lib/domain/geo';
 import { StageHeader } from '@/components/stage/StageHeader';
 import { StageStats } from '@/components/stage/StageStats';
+import { StageTimeline } from '@/components/stage/StageTimeline';
+import { TransitEditForm } from '@/components/stage/TransitEditForm';
 import { DifficultyBadge } from '@/components/difficulty/DifficultyBadge';
 import type { DifficultyClass } from '@/lib/domain/difficulty';
 import { naismithHours } from '@/lib/domain/eta';
@@ -46,8 +48,25 @@ export default function StagePage() {
 
   const [fetchingWeather, setFetchingWeather] = useState(false);
 
+  // Where to sample weather: a trek day uses its route midpoint; a transit day
+  // uses its optional location anchor (it has no route). null = can't sample.
+  const weatherPoint = useMemo<{ lat: number; lon: number } | null>(() => {
+    if (stage?.stage_type === 'transit') {
+      if (stage.location_lat != null && stage.location_lon != null) {
+        return { lat: stage.location_lat, lon: stage.location_lon };
+      }
+      return null;
+    }
+    if (route) {
+      const midKm = route.total_distance_km / 2;
+      const [lon, lat] = pointAtDistance(route.geojson, midKm);
+      return { lat, lon };
+    }
+    return null;
+  }, [stage?.stage_type, stage?.location_lat, stage?.location_lon, route?.id, route?.total_distance_km]);
+
   useEffect(() => {
-    if (!stage || !trail || !route || !allStages) return;
+    if (!stage || !trail || !weatherPoint || !allStages) return;
     if (!trail.start_date) return;
     if (cachedWeather !== undefined && weatherRepo.isFresh(cachedWeather)) return;
 
@@ -64,9 +83,7 @@ export default function StagePage() {
     const daysAhead = (new Date(targetDate + 'T00:00:00').getTime() - todayStart.getTime()) / 86_400_000;
     if (daysAhead < 0 || daysAhead > 16) return;
 
-    // Weather is sampled at the midpoint of this stage's own route geometry.
-    const midKm = route.total_distance_km / 2;
-    const [lon, lat] = pointAtDistance(route.geojson, midKm);
+    const { lat, lon } = weatherPoint;
 
     setFetchingWeather(true);
     fetchOpenMeteo(lat, lon, targetDate)
@@ -88,20 +105,18 @@ export default function StagePage() {
     stageId,
     trail?.id,
     trail?.start_date,
-    route?.id,
-    route?.total_distance_km,
+    weatherPoint,
     allStages,
     cachedWeather?.fetched_at,
   ]);
 
   // MeteoAlarm warnings for the country the stage runs through (country-level).
   useEffect(() => {
-    if (!trail || !route) return;
+    if (!trail || !weatherPoint) return;
     if (cachedAlerts && alertsRepo.isFresh(cachedAlerts)) return;
     if (typeof navigator !== 'undefined' && !navigator.onLine) return;
 
-    const midKm = route.total_distance_km / 2;
-    const [lon, lat] = pointAtDistance(route.geojson, midKm);
+    const { lat, lon } = weatherPoint;
 
     fetch(`/api/alerts?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`)
       .then((r) => (r.ok ? r.json() : null))
@@ -109,7 +124,7 @@ export default function StagePage() {
         if (data) return alertsRepo.save(trailId, data.country, data.alerts);
       })
       .catch(() => {});
-  }, [trailId, trail?.id, route?.id, route?.total_distance_km, cachedAlerts?.fetched_at]);
+  }, [trailId, trail?.id, weatherPoint, cachedAlerts?.fetched_at]);
 
   const stageMapRoutes: MapRoute[] = useMemo(() => {
     if (!route) return [];
@@ -138,6 +153,7 @@ export default function StagePage() {
     );
   }
 
+  const isTransit = stage.stage_type === 'transit';
   const paceKmh = trail.default_pace_kmh;
   const totalHours = naismithHours(stage.distance_km, stage.ascent_m, paceKmh);
 
@@ -173,52 +189,74 @@ export default function StagePage() {
           dayNumber={stageIndex + 1}
           difficultyClass={stage.difficulty_class as DifficultyClass | null}
           difficultyScore={stage.difficulty_score}
+          stageType={stage.stage_type}
         />
       </div>
 
-      {/* ETA highlight */}
-      <div className="mb-6 flex items-center gap-3 rounded-2xl bg-primary px-5 py-4 text-primary-foreground">
-        <ClockIcon className="h-6 w-6 shrink-0 opacity-80" />
-        <div>
-          <p className="text-xs font-medium opacity-70">Estimated hiking time</p>
-          <p className="text-2xl font-bold tabular-nums">{formatHours(totalHours)}</p>
-          {trail.start_date && (
-            <p className="text-xs opacity-70">
-              at {paceKmh} km/h pace
+      {/* Transit day — editable day timeline is the focus */}
+      {isTransit && (
+        <section className="mb-6">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Timeline
+          </h2>
+          <StageTimeline milestones={stage.timeline} />
+          {stage.location_name && (
+            <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <MapPinIcon className="h-3.5 w-3.5" />
+              Weather for {stage.location_name}
             </p>
           )}
-        </div>
-      </div>
-
-      {/* Stats grid */}
-      <StageStats stats={stats} className="mb-6" />
-
-      {/* Elevation profile — visible once route + stage boundaries are linked */}
-      {stageProfile && (
-        <section className="mb-6 rounded-2xl border bg-card px-4 pt-3 pb-2">
-          <h2 className="mb-1 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            Elevation
-          </h2>
-          <ElevationChart profile={stageProfile} />
         </section>
       )}
 
-      {/* Route map */}
-      {stageMapRoutes.length > 0 && (
-        <section className="mb-6 overflow-hidden rounded-2xl border bg-card">
-          <div className="flex items-center justify-between px-4 pt-3 pb-2">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Map
-            </h2>
-            <Link
-              href={`/trails/${trailId}/map`}
-              className="text-xs text-primary hover:underline"
-            >
-              Full map
-            </Link>
+      {/* Trek day — ETA, stats, elevation, map */}
+      {!isTransit && (
+        <>
+          {/* ETA highlight */}
+          <div className="mb-6 flex items-center gap-3 rounded-2xl bg-primary px-5 py-4 text-primary-foreground">
+            <ClockIcon className="h-6 w-6 shrink-0 opacity-80" />
+            <div>
+              <p className="text-xs font-medium opacity-70">Estimated hiking time</p>
+              <p className="text-2xl font-bold tabular-nums">{formatHours(totalHours)}</p>
+              {trail.start_date && (
+                <p className="text-xs opacity-70">
+                  at {paceKmh} km/h pace
+                </p>
+              )}
+            </div>
           </div>
-          <MapView routes={stageMapRoutes} className="h-56 w-full" />
-        </section>
+
+          {/* Stats grid */}
+          <StageStats stats={stats} className="mb-6" />
+
+          {/* Elevation profile — visible once route + stage boundaries are linked */}
+          {stageProfile && (
+            <section className="mb-6 rounded-2xl border bg-card px-4 pt-3 pb-2">
+              <h2 className="mb-1 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                Elevation
+              </h2>
+              <ElevationChart profile={stageProfile} />
+            </section>
+          )}
+
+          {/* Route map */}
+          {stageMapRoutes.length > 0 && (
+            <section className="mb-6 overflow-hidden rounded-2xl border bg-card">
+              <div className="flex items-center justify-between px-4 pt-3 pb-2">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  Map
+                </h2>
+                <Link
+                  href={`/trails/${trailId}/map`}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Full map
+                </Link>
+              </div>
+              <MapView routes={stageMapRoutes} className="h-56 w-full" />
+            </section>
+          )}
+        </>
       )}
 
       {/* Weather warnings (MeteoAlarm) */}
@@ -271,16 +309,17 @@ export default function StagePage() {
 
       {/* Quick edit */}
       {editing ? (
-        <EditStageForm
-          stage={stage}
-          onDone={() => setEditing(false)}
-        />
+        isTransit ? (
+          <TransitEditForm stage={stage} onDone={() => setEditing(false)} />
+        ) : (
+          <EditStageForm stage={stage} onDone={() => setEditing(false)} />
+        )
       ) : (
         <button
           onClick={() => setEditing(true)}
           className="mb-6 w-full rounded-2xl border py-3 text-sm font-medium hover:bg-muted"
         >
-          Edit stage
+          Edit {isTransit ? 'day' : 'stage'}
         </button>
       )}
 
@@ -321,7 +360,11 @@ export default function StagePage() {
       <AlertDialog
         open={deleteOpen}
         title="Delete stage?"
-        description={`"${stage.title}" and its route will be permanently deleted.`}
+        description={
+          isTransit
+            ? `"${stage.title}" and its timeline will be permanently deleted.`
+            : `"${stage.title}" and its route will be permanently deleted.`
+        }
         confirmLabel="Delete"
         cancelLabel="Cancel"
         destructive

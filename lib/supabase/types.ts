@@ -105,9 +105,14 @@ export type Database = {
           distance_km: number
           end_distance_km: number | null
           id: string
+          location_lat: number | null
+          location_lon: number | null
+          location_name: string | null
           notes: string | null
           order_index: number
+          stage_type: string
           start_distance_km: number | null
+          timeline: Json
           title: string
           trail_id: string
           updated_at: string
@@ -123,9 +128,14 @@ export type Database = {
           distance_km: number
           end_distance_km?: number | null
           id: string
+          location_lat?: number | null
+          location_lon?: number | null
+          location_name?: string | null
           notes?: string | null
           order_index: number
+          stage_type?: string
           start_distance_km?: number | null
+          timeline?: Json
           title: string
           trail_id: string
           updated_at?: string
@@ -141,9 +151,14 @@ export type Database = {
           distance_km?: number
           end_distance_km?: number | null
           id?: string
+          location_lat?: number | null
+          location_lon?: number | null
+          location_name?: string | null
           notes?: string | null
           order_index?: number
+          stage_type?: string
           start_distance_km?: number | null
+          timeline?: Json
           title?: string
           trail_id?: string
           updated_at?: string
