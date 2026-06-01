@@ -162,6 +162,10 @@ export default function StagePage() {
   const stageIndex = allStages.findIndex((s) => s.id === stageId);
   const prevStage = stageIndex > 0 ? allStages[stageIndex - 1] : null;
   const nextStage = stageIndex < allStages.length - 1 ? allStages[stageIndex + 1] : null;
+  // Day number counts trek days only — transit days are excluded.
+  const trekDayNumber = allStages
+    .slice(0, stageIndex + 1)
+    .filter((s) => s.stage_type !== 'transit').length;
 
   const stats = [
     { label: 'Distance', value: `${stage.distance_km} km`, icon: '↔' },
@@ -186,7 +190,7 @@ export default function StagePage() {
       <div className="mb-6">
         <StageHeader
           title={stage.title}
-          dayNumber={stageIndex + 1}
+          dayNumber={trekDayNumber}
           difficultyClass={stage.difficulty_class as DifficultyClass | null}
           difficultyScore={stage.difficulty_score}
           stageType={stage.stage_type}

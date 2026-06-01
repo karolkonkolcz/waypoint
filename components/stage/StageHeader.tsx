@@ -14,7 +14,9 @@ interface Props {
 export function StageHeader({ title, dayNumber, difficultyClass, difficultyScore, stageType = 'trek' }: Props) {
   return (
     <div className="space-y-1">
-      <p className="text-sm font-medium text-muted-foreground">Day {dayNumber}</p>
+      {stageType !== 'transit' && (
+        <p className="text-sm font-medium text-muted-foreground">Day {dayNumber}</p>
+      )}
       <h1 className="text-2xl font-bold leading-tight">{title}</h1>
       {stageType === 'transit' ? (
         <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">

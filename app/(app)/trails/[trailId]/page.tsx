@@ -161,7 +161,8 @@ export default function TrailPage() {
                   {stage.stage_type === 'transit' ? (
                     <ArrowRightLeftIcon className="h-4 w-4" />
                   ) : (
-                    idx + 1
+                    // Number only trek days — transit days don't count.
+                    stages.slice(0, idx + 1).filter((s) => s.stage_type !== 'transit').length
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
