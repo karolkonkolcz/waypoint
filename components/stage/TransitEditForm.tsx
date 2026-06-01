@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
+import { useLiveQuery } from 'dexie-react-hooks';
 import {
   PlusIcon,
   Trash2Icon,
@@ -12,10 +14,19 @@ import {
   XIcon,
 } from 'lucide-react';
 import { stageRepo } from '@/lib/db/repositories/stage.repo';
+import { routeRepo } from '@/lib/db/repositories/route.repo';
 import { newId } from '@/lib/db/repositories/base';
 import type { StageRow, Milestone, MilestoneKind } from '@/lib/db/dexie';
 import { searchPlaces, formatPlace, type GeocodeResult } from '@/lib/weather/geocoding';
+import type { MapRoute } from '@/components/map/MapView';
+import { DEFAULT_LINE_COLOR } from '@/components/map/colors';
 import { MILESTONE_KINDS, MILESTONE_META } from './StageTimeline';
+
+// MapLibre is heavy and browser-only — keep it out of the main bundle (§11).
+const MapView = dynamic(() => import('@/components/map/MapView').then((m) => m.MapView), {
+  ssr: false,
+  loading: () => <div className="h-56 w-full animate-pulse bg-muted" />,
+});
 
 function blankMilestone(): Milestone {
   return { id: newId(), time: null, title: '', kind: 'transfer', location: null, notes: null };
@@ -35,9 +46,25 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
   const [results, setResults] = useState<GeocodeResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [showManual, setShowManual] = useState(false);
+  const [showMap, setShowMap] = useState(false);
   const skipSearch = useRef(false);
 
   const hasAnchor = lat.trim() !== '' && lon.trim() !== '';
+
+  // Trail routes give the picker geographic context (and auto-fit the trek).
+  const trailRoutes = useLiveQuery(() => routeRepo.findAllByTrail(stage.trail_id), [stage.trail_id]);
+  const contextRoutes: MapRoute[] = useMemo(
+    () =>
+      (trailRoutes ?? [])
+        .filter((r) => r.geojson.coordinates.length > 0)
+        .map((r) => ({ id: r.id, geojson: r.geojson, color: DEFAULT_LINE_COLOR })),
+    [trailRoutes],
+  );
+
+  const latN = parseFloat(lat);
+  const lonN = parseFloat(lon);
+  const markerPoint =
+    Number.isFinite(latN) && Number.isFinite(lonN) ? { lat: latN, lon: lonN } : null;
 
   // Debounced search: refetch ~300ms after typing stops; abort stale requests.
   useEffect(() => {
@@ -85,6 +112,16 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
     setResults([]);
     setShowManual(false);
   }
+
+  // Map tap drops a custom point — coordinates only, so any stale name is cleared.
+  const pickOnMap = useCallback((latNum: number, lonNum: number) => {
+    skipSearch.current = true;
+    setLat(latNum.toFixed(4));
+    setLon(lonNum.toFixed(4));
+    setLocationName('');
+    setQuery('');
+    setResults([]);
+  }, []);
 
   function patch(id: string, change: Partial<Milestone>) {
     setItems((prev) => prev.map((m) => (m.id === id ? { ...m, ...change } : m)));
@@ -321,8 +358,15 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
           <p className="text-xs text-muted-foreground">No places found for “{query.trim()}”.</p>
         )}
 
-        {!hasAnchor && (
-          <div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <button
+            type="button"
+            onClick={() => setShowMap((v) => !v)}
+            className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+          >
+            {showMap ? 'Hide map' : 'Pick on map'}
+          </button>
+          {!hasAnchor && (
             <button
               type="button"
               onClick={() => setShowManual((v) => !v)}
@@ -330,37 +374,49 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
             >
               {showManual ? 'Hide manual entry' : 'Enter coordinates manually'}
             </button>
-            {showManual && (
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Latitude</label>
-                  <input
-                    value={lat}
-                    onChange={(e) => setLat(e.target.value)}
-                    inputMode="decimal"
-                    placeholder="42.7028"
-                    className="input"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Longitude</label>
-                  <input
-                    value={lon}
-                    onChange={(e) => setLon(e.target.value)}
-                    inputMode="decimal"
-                    placeholder="9.4503"
-                    className="input"
-                  />
-                </div>
-              </div>
-            )}
+          )}
+        </div>
+
+        {showMap && (
+          <div className="overflow-hidden rounded-xl border">
+            <MapView
+              routes={contextRoutes}
+              marker={markerPoint}
+              onPick={pickOnMap}
+              className="h-56 w-full"
+            />
+          </div>
+        )}
+
+        {showManual && !hasAnchor && (
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Latitude</label>
+              <input
+                value={lat}
+                onChange={(e) => setLat(e.target.value)}
+                inputMode="decimal"
+                placeholder="42.7028"
+                className="input"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Longitude</label>
+              <input
+                value={lon}
+                onChange={(e) => setLon(e.target.value)}
+                inputMode="decimal"
+                placeholder="9.4503"
+                className="input"
+              />
+            </div>
           </div>
         )}
 
         <p className="text-xs text-muted-foreground">
           {hasAnchor
-            ? 'Forecast will be shown for this day.'
-            : 'Search a place to show a forecast for this day.'}
+            ? 'Forecast will be shown for this day. Tap the map to adjust.'
+            : 'Search or tap the map to show a forecast for this day.'}
         </p>
       </div>
 

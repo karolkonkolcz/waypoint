@@ -17,6 +17,10 @@ interface Props {
   routes: MapRoute[];
   className?: string;
   interactive?: boolean;
+  /** When set, clicking the map reports the tapped coordinates (pick mode). */
+  onPick?: (lat: number, lon: number) => void;
+  /** A pin to display, e.g. the currently picked location. */
+  marker?: { lat: number; lon: number } | null;
 }
 
 const MAPTILER_KEY = process.env.NEXT_PUBLIC_MAPTILER_API_KEY;
@@ -49,9 +53,11 @@ function ensurePmtilesProtocol() {
   pmtilesRegistered = true;
 }
 
-export function MapView({ routes, className, interactive = true }: Props) {
+export function MapView({ routes, className, interactive = true, onPick, marker }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const markerRef = useRef<maplibregl.Marker | null>(null);
+  const centeredRef = useRef(false);
 
   // Create the map once.
   useEffect(() => {
@@ -119,6 +125,38 @@ export function MapView({ routes, className, interactive = true }: Props) {
     if (map.isStyleLoaded()) draw();
     else map.once('load', draw);
   }, [routes]);
+
+  // Pick mode: report tapped coordinates and use a crosshair cursor.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !onPick) return;
+    const handler = (e: maplibregl.MapMouseEvent) => onPick(e.lngLat.lat, e.lngLat.lng);
+    map.on('click', handler);
+    const canvas = map.getCanvas();
+    canvas.style.cursor = 'crosshair';
+    return () => {
+      map.off('click', handler);
+      canvas.style.cursor = '';
+    };
+  }, [onPick]);
+
+  // Place / move / remove the marker pin.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (!marker) {
+      markerRef.current?.remove();
+      markerRef.current = null;
+      return;
+    }
+    if (!markerRef.current) markerRef.current = new maplibregl.Marker({ color: '#2563eb' });
+    markerRef.current.setLngLat([marker.lon, marker.lat]).addTo(map);
+    // Frame the pin once on first appearance when there's no route to fit to.
+    if (!centeredRef.current && routes.length === 0) {
+      map.jumpTo({ center: [marker.lon, marker.lat], zoom: Math.max(map.getZoom(), 9) });
+      centeredRef.current = true;
+    }
+  }, [marker, routes.length]);
 
   return <div ref={containerRef} className={className} />;
 }
