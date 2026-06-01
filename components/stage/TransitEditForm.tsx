@@ -53,6 +53,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
 
   // Trail routes give the picker geographic context (and auto-fit the trek).
   const trailRoutes = useLiveQuery(() => routeRepo.findAllByTrail(stage.trail_id), [stage.trail_id]);
+  const allStages = useLiveQuery(() => stageRepo.findByTrail(stage.trail_id), [stage.trail_id]);
   const contextRoutes: MapRoute[] = useMemo(
     () =>
       (trailRoutes ?? [])
@@ -60,6 +61,27 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
         .map((r) => ({ id: r.id, geojson: r.geojson, color: DEFAULT_LINE_COLOR })),
     [trailRoutes],
   );
+
+  // Neighbour endpoints: a transit day usually adjoins a trek day, so offer the
+  // end of the previous stage's route and the start of the next stage's route.
+  const neighbours = useMemo(() => {
+    const ordered = allStages ?? [];
+    const idx = ordered.findIndex((s) => s.id === stage.id);
+    if (idx < 0) return { prevEnd: null, nextStart: null };
+    const byStage = new Map(
+      (trailRoutes ?? []).filter((r) => r.stage_id).map((r) => [r.stage_id as string, r]),
+    );
+    const endpoint = (s: StageRow | undefined, which: 'first' | 'last') => {
+      const coords = s ? byStage.get(s.id)?.geojson.coordinates : undefined;
+      if (!coords || coords.length === 0) return null;
+      const c = which === 'first' ? coords[0] : coords[coords.length - 1];
+      return { lat: c[1], lon: c[0] };
+    };
+    return {
+      prevEnd: endpoint(idx > 0 ? ordered[idx - 1] : undefined, 'last'),
+      nextStart: endpoint(idx < ordered.length - 1 ? ordered[idx + 1] : undefined, 'first'),
+    };
+  }, [allStages, trailRoutes, stage.id]);
 
   const latN = parseFloat(lat);
   const lonN = parseFloat(lon);
@@ -356,6 +378,31 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
 
         {!hasAnchor && query.trim().length >= 2 && !searching && results.length === 0 && (
           <p className="text-xs text-muted-foreground">No places found for “{query.trim()}”.</p>
+        )}
+
+        {!hasAnchor && (neighbours.prevEnd || neighbours.nextStart) && (
+          <div className="flex flex-wrap gap-2">
+            {neighbours.prevEnd && (
+              <button
+                type="button"
+                onClick={() => pickOnMap(neighbours.prevEnd!.lat, neighbours.prevEnd!.lon)}
+                className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium hover:bg-accent"
+              >
+                <MapPinIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                End of previous day
+              </button>
+            )}
+            {neighbours.nextStart && (
+              <button
+                type="button"
+                onClick={() => pickOnMap(neighbours.nextStart!.lat, neighbours.nextStart!.lon)}
+                className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium hover:bg-accent"
+              >
+                <MapPinIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                Start of next day
+              </button>
+            )}
+          </div>
         )}
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
