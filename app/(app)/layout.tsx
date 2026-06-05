@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ListIcon, SettingsIcon } from 'lucide-react';
+import { ListIcon, SettingsIcon, SunriseIcon } from 'lucide-react';
 import { SyncProvider } from '@/components/sync/SyncProvider';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -11,6 +11,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="mx-auto flex max-w-lg items-center justify-around px-4 py-2">
           <NavItem href="/" icon={<ListIcon className="h-5 w-5" />} label="Trails" />
+          <NavItem href="/today" icon={<SunriseIcon className="h-5 w-5" />} label="Today" />
           <NavItem href="/settings" icon={<SettingsIcon className="h-5 w-5" />} label="Settings" />
         </div>
       </nav>

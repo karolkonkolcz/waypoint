@@ -98,3 +98,22 @@ body {
 .input:focus {
   box-shadow: 0 0 0 2px var(--ring);
 }
+
+/* MovingForecast "YOU" marker — sweeps across the day's timeline. */
+@keyframes you-sweep {
+  from { left: 4%; }
+  to { left: 92%; }
+}
+
+.you-marker {
+  left: 4%;
+  animation: you-sweep 7s ease-in-out infinite alternate;
+}
+
+/* Reduced motion: park the marker mid-track, no animation. */
+@media (prefers-reduced-motion: reduce) {
+  .you-marker {
+    left: 50%;
+    animation: none;
+  }
+}
