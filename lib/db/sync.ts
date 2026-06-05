@@ -20,11 +20,12 @@ const dexieTables = {
   routes: () => db.routes,
   stages: () => db.stages,
   waypoints: () => db.waypoints,
+  todos: () => db.todos,
 } as const;
 
 type SyncableEntity = keyof typeof dexieTables;
 
-const SYNCABLE: SyncableEntity[] = ['trails', 'routes', 'stages', 'waypoints'];
+const SYNCABLE: SyncableEntity[] = ['trails', 'routes', 'stages', 'waypoints', 'todos'];
 
 /** Strip Dexie-internal fields before sending to Supabase. */
 function toSupabaseRow(row: Record<string, unknown>): Record<string, unknown> {

@@ -106,6 +106,19 @@ export interface WeatherRow extends Sync {
   fetched_at: string;
 }
 
+export interface TodoRow extends Sync {
+  id: string;
+  user_id: string;
+  trail_id: string;
+  // Optional anchors: pin to a specific stage and/or a calendar day. Both null
+  // = a trail-level reminder.
+  stage_id: string | null;
+  date: string | null;
+  text: string;
+  done: boolean;
+  order_index: number;
+}
+
 // Derived cache (not synced to Supabase). One row per trail — MeteoAlarm
 // warnings are country-level, so the whole trail shares them.
 export interface AlertCacheRow {
@@ -130,6 +143,7 @@ class WaypointDB extends Dexie {
   waypoints!: Table<WaypointRow, string>;
   weather!: Table<WeatherRow, string>;
   alerts!: Table<AlertCacheRow, string>;
+  todos!: Table<TodoRow, string>;
   syncQueue!: Table<SyncOp, number>;
 
   constructor() {
@@ -193,6 +207,12 @@ class WaypointDB extends Dexie {
           if (s.date === undefined) s.date = null;
         }),
     );
+
+    // v6: todos store (dashboard reminders). Compound [trail_id+done] index
+    // backs the "N left" count; stage_id index backs per-day pinning.
+    this.version(6).stores({
+      todos: 'id, trail_id, stage_id, [trail_id+done], _dirty',
+    });
   }
 }
 
