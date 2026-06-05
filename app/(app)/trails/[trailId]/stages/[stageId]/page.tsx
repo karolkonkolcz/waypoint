@@ -22,6 +22,7 @@ import { TransitEditForm } from '@/components/stage/TransitEditForm';
 import { DifficultyBadge } from '@/components/difficulty/DifficultyBadge';
 import type { DifficultyClass } from '@/lib/domain/difficulty';
 import { naismithHours } from '@/lib/domain/eta';
+import { formatHours } from '@/lib/format/hours';
 import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/db/dexie';
 import dynamic from 'next/dynamic';
@@ -485,11 +486,4 @@ function LoadingState() {
       </div>
     </div>
   );
-}
-
-function formatHours(h: number): string {
-  if (h < 1) return `${Math.round(h * 60)} min`;
-  const hours = Math.floor(h);
-  const mins = Math.round((h - hours) * 60);
-  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
 }

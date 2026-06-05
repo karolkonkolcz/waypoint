@@ -1,30 +1,8 @@
 'use client';
 
-import {
-  SunIcon,
-  CloudIcon,
-  CloudSunIcon,
-  CloudRainIcon,
-  CloudDrizzleIcon,
-  CloudSnowIcon,
-  CloudLightningIcon,
-  DropletIcon,
-  WindIcon,
-} from 'lucide-react';
-import type { WeatherSnapshot, WeatherCondition } from '@/lib/weather/forecast';
-
-type IconFC = React.FC<{ className?: string }>;
-
-const CONDITION_ICON: Record<WeatherCondition, IconFC> = {
-  'clear': SunIcon,
-  'partly-cloudy': CloudSunIcon,
-  'cloudy': CloudIcon,
-  'fog': CloudIcon,
-  'drizzle': CloudDrizzleIcon,
-  'rain': CloudRainIcon,
-  'snow': CloudSnowIcon,
-  'storm': CloudLightningIcon,
-};
+import { DropletIcon, WindIcon } from 'lucide-react';
+import type { WeatherSnapshot } from '@/lib/weather/forecast';
+import { CONDITION_ICON } from '@/components/weather/conditionIcon';
 
 interface Props {
   snapshot: WeatherSnapshot;
