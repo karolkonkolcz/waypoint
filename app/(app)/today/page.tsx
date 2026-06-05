@@ -15,9 +15,9 @@ import { todoRepo } from '@/lib/db/repositories/todo.repo';
 import { db } from '@/lib/db/dexie';
 import { createClient } from '@/lib/supabase/client';
 
-import { fetchOpenMeteo } from '@/lib/weather/openmeteo';
-import { buildSnapshot, type WeatherSnapshot } from '@/lib/weather/forecast';
-import { pointAtDistance } from '@/lib/domain/geo';
+import { fetchOpenMeteo, fetchOpenMeteoMulti } from '@/lib/weather/openmeteo';
+import { buildSnapshot, buildRouteSnapshot, type WeatherSnapshot } from '@/lib/weather/forecast';
+import { pointAtDistance, samplePoints } from '@/lib/domain/geo';
 import { stageDate } from '@/lib/domain/stageDate';
 import { naismithHours } from '@/lib/domain/eta';
 import { formatHours } from '@/lib/format/hours';
@@ -45,6 +45,12 @@ function localToday(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
     d.getDate(),
   ).padStart(2, '0')}`;
+}
+
+/** Day start hour for ETA projection — trail preference, default 08:00. */
+function getStartHour(preferences: Record<string, unknown>): number {
+  const v = preferences?.start_hour;
+  return typeof v === 'number' && v >= 0 && v <= 23 ? v : 8;
 }
 
 export default function TodayPage() {
@@ -140,15 +146,48 @@ export default function TodayPage() {
     return null;
   }, [todayStage?.stage_type, todayStage?.location_lat, todayStage?.location_lon, route?.id, route?.total_distance_km]);
 
-  // Refresh weather only when the cache is stale and within Open-Meteo's window.
+  // Refresh weather when the cache is stale. Trek days sample several points
+  // along the route (one batched request) and build a route-aware "moving"
+  // forecast; transit days / route-less days sample the single anchor point.
   useEffect(() => {
-    if (!todayStage || !activeTrail || !weatherPoint) return;
+    if (!todayStage || !activeTrail) return;
     if (cachedWeather !== undefined && weatherRepo.isFresh(cachedWeather)) return;
     if (typeof navigator !== 'undefined' && !navigator.onLine) return;
 
     const targetDate = stageDate(todayStage, activeTrail.start_date);
     if (!targetDate) return;
 
+    const isTrekWithRoute = todayStage.stage_type !== 'transit' && !!route;
+
+    if (isTrekWithRoute && route) {
+      const points = samplePoints(route.geojson, 6).map(([lon, lat]) => ({ lat, lon }));
+      const mid = points[Math.floor((points.length - 1) / 2)];
+      setFetchingWeather(true);
+      fetchOpenMeteoMulti(points, targetDate)
+        .then((results) =>
+          weatherRepo.save({
+            trail_id: activeTrail.id,
+            stage_id: todayStage.id,
+            user_id: activeTrail.user_id,
+            lat: mid.lat,
+            lon: mid.lon,
+            date: targetDate,
+            snapshot: buildRouteSnapshot({
+              results,
+              route: route.geojson,
+              elevationProfile: route.elevation_profile,
+              paceKmh: activeTrail.default_pace_kmh,
+              startHour: getStartHour(activeTrail.preferences),
+              date: targetDate,
+            }),
+          }),
+        )
+        .catch(console.error)
+        .finally(() => setFetchingWeather(false));
+      return;
+    }
+
+    if (!weatherPoint) return;
     const { lat, lon } = weatherPoint;
     setFetchingWeather(true);
     fetchOpenMeteo(lat, lon, targetDate)
@@ -165,7 +204,15 @@ export default function TodayPage() {
       )
       .catch(console.error)
       .finally(() => setFetchingWeather(false));
-  }, [todayStage?.id, activeTrail?.id, activeTrail?.start_date, weatherPoint, cachedWeather?.fetched_at]);
+  }, [
+    todayStage?.id,
+    activeTrail?.id,
+    activeTrail?.start_date,
+    activeTrail?.default_pace_kmh,
+    route?.id,
+    weatherPoint,
+    cachedWeather?.fetched_at,
+  ]);
 
   const mapRoutes: MapRoute[] = useMemo(() => {
     if (!route) return [];

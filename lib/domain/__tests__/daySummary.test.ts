@@ -48,6 +48,29 @@ describe('buildDaySummary', () => {
     expect(buildDaySummary({ stage: { ...trek, ascent_m: 1500 } })).toContain('a big 1500 m climb');
   });
 
+  it('uses route-aware rain timing when the snapshot is moving', () => {
+    const s = {
+      ...snapshot([entry(8, 0), entry(12, 0), entry(16, 0)], 2),
+      moving: [
+        { hour: 8, km: 0, lat: 0, lon: 0, tempC: 12, precipMm: 0, windKmh: 5, condition: 'clear' as const },
+        { hour: 13, km: 9, lat: 0, lon: 0, tempC: 14, precipMm: 1.5, windKmh: 8, condition: 'rain' as const },
+      ],
+      rainStartsHour: 13,
+      rainStartsKm: 9,
+    };
+    expect(buildDaySummary({ stage: trek, snapshot: s })).toContain('rain reaches you around 13:00');
+  });
+
+  it('says dry all day for a moving snapshot with no rain', () => {
+    const s = {
+      ...snapshot([entry(8, 0)], 0),
+      moving: [{ hour: 8, km: 0, lat: 0, lon: 0, tempC: 12, precipMm: 0, windKmh: 5, condition: 'clear' as const }],
+      rainStartsHour: null,
+      rainStartsKm: null,
+    };
+    expect(buildDaySummary({ stage: trek, snapshot: s })).toContain('dry all day');
+  });
+
   it('frames a transit day as travel', () => {
     expect(
       buildDaySummary({ stage: { stage_type: 'transit', title: 'Chamonix', distance_km: 0, ascent_m: 0, difficulty_class: null } }),

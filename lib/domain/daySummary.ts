@@ -23,6 +23,15 @@ function climbClause(ascentM: number): string {
 /** Phrase the day's weather trend from the snapshot, or null if none cached. */
 function weatherClause(snapshot: WeatherSnapshot | null | undefined): string | null {
   if (!snapshot) return null;
+
+  // Route-aware snapshot knows exactly when rain catches you along the way.
+  if (snapshot.moving && snapshot.moving.length > 0) {
+    if (snapshot.rainStartsHour != null) {
+      return `rain reaches you around ${String(snapshot.rainStartsHour).padStart(2, '0')}:00`;
+    }
+    return 'dry all day';
+  }
+
   if (snapshot.precipTotalMm === 0) return 'dry all day';
 
   const entries = snapshot.entries;
