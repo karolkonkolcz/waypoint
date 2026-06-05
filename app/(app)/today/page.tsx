@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useState } from 'react';
-import { MapPinIcon } from 'lucide-react';
+import { MapPinIcon, MapIcon } from 'lucide-react';
 
 import { trailRepo } from '@/lib/db/repositories/trail.repo';
 import { stageRepo } from '@/lib/db/repositories/stage.repo';
@@ -228,28 +228,47 @@ export default function TodayPage() {
           )}
         </div>
       ) : (
-        <Link
-          href={`/trails/${activeTrail.id}/map`}
-          className="relative block h-44 overflow-hidden rounded-2xl border bg-card"
-        >
-          {mapRoutes.length > 0 ? (
-            <MapView routes={mapRoutes} interactive={false} className="h-44 w-full" />
-          ) : (
-            <div className="h-44 w-full bg-muted" />
+        <div>
+          <Link
+            href={`/trails/${activeTrail.id}/map`}
+            className="relative block h-44 overflow-hidden rounded-2xl border bg-card"
+          >
+            {mapRoutes.length > 0 ? (
+              <MapView routes={mapRoutes} interactive={false} attribution={false} className="h-44 w-full" />
+            ) : (
+              <div className="h-44 w-full bg-muted" />
+            )}
+
+            {/* Legibility scrims so overlays read over any terrain. */}
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/30 to-transparent" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/45 to-transparent" />
+
+            {/* Greeting overlay */}
+            <span className="absolute left-2 top-2 rounded-lg bg-card/85 px-2.5 py-1 text-xl font-bold backdrop-blur">
+              {getGreeting(new Date(), name)}
+            </span>
+
+            {/* Tap affordance — the hero opens the full map. */}
+            <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-card/85 px-2 py-1 text-[11px] font-medium backdrop-blur">
+              <MapIcon className="h-3 w-3" />
+              Open map
+            </span>
+
+            {/* Stat chips */}
+            <div className="absolute inset-x-2 bottom-2 flex gap-2">
+              <StatChip label="distance" value={`${todayStage.distance_km} km`} />
+              <StatChip label="ascent" value={`+${todayStage.ascent_m} m`} />
+              <StatChip label="ETA" value={eta} />
+            </div>
+          </Link>
+
+          {/* Static credit — the decorative hero drops MapLibre's interactive control. */}
+          {mapRoutes.length > 0 && (
+            <p className="mt-1 px-1 text-right text-[10px] text-muted-foreground">
+              © MapTiler © OpenStreetMap
+            </p>
           )}
-
-          {/* Greeting overlay */}
-          <span className="absolute left-2 top-2 rounded-lg bg-card/85 px-2.5 py-1 text-xl font-bold backdrop-blur">
-            {getGreeting(new Date(), name)}
-          </span>
-
-          {/* Stat chips */}
-          <div className="absolute inset-x-2 bottom-2 flex gap-2">
-            <StatChip label="distance" value={`${todayStage.distance_km} km`} />
-            <StatChip label="ascent" value={`+${todayStage.ascent_m} m`} />
-            <StatChip label="ETA" value={eta} />
-          </div>
-        </Link>
+        </div>
       )}
 
       {/* Block 2 — Moving forecast */}

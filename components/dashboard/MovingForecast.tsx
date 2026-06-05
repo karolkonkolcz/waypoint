@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import type { WeatherSnapshot } from '@/lib/weather/forecast';
 import { CONDITION_ICON } from '@/components/weather/conditionIcon';
 import { cn } from '@/lib/utils';
@@ -10,15 +11,42 @@ interface Props {
 }
 
 /**
- * The day's forecast laid out along its timeline, with a "YOU" marker that
- * sweeps across to suggest where the hiker will be as conditions change.
- * Slots come straight from the cached snapshot (3–5 entries). The marker is a
- * pure CSS animation (reduced-motion safe); wiring it to real route-position
- * interpolation is a follow-up.
+ * The day's forecast laid out along its timeline. The "YOU" marker is a
+ * progress indicator: it sits where the current local time falls within the
+ * forecast window (first slot → last slot), so a glance shows how far into the
+ * day you are and what's still ahead. Updates every minute; clamps to the
+ * window edges outside hiking hours.
  */
 export function MovingForecast({ snapshot, loading }: Props) {
   const entries = snapshot.entries;
+
+  // Current minutes-since-midnight, set after mount to avoid SSR/hydration
+  // mismatch, then ticked once a minute so the marker creeps across the day.
+  const [nowMin, setNowMin] = useState<number | null>(null);
+  useEffect(() => {
+    const tick = () => {
+      const d = new Date();
+      setNowMin(d.getHours() * 60 + d.getMinutes());
+    };
+    tick();
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   if (entries.length === 0) return null;
+
+  // Map "now" onto the track: slot hours sit at column centres, so the marker
+  // travels from the first slot's centre to the last slot's centre.
+  const n = entries.length;
+  const firstH = entries[0].hour;
+  const lastH = entries[n - 1].hour;
+  let markerPct: number | null = null;
+  if (nowMin !== null && lastH > firstH) {
+    const frac = Math.min(1, Math.max(0, (nowMin - firstH * 60) / ((lastH - firstH) * 60)));
+    const firstCentre = (0.5 / n) * 100;
+    const lastCentre = ((n - 0.5) / n) * 100;
+    markerPct = firstCentre + frac * (lastCentre - firstCentre);
+  }
 
   return (
     <section className="rounded-2xl border bg-card p-3">
@@ -54,14 +82,20 @@ export function MovingForecast({ snapshot, loading }: Props) {
           })}
         </div>
 
-        {/* Animated marker — vertical line + dot + "YOU" label. */}
-        <div className="you-marker pointer-events-none absolute top-0 bottom-2 flex -translate-x-1/2 flex-col items-center">
-          <span className="rounded bg-primary px-1 py-px text-[8px] font-bold uppercase leading-none tracking-wide text-primary-foreground">
-            You
-          </span>
-          <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary" />
-          <span className="w-px flex-1 bg-primary/70" />
-        </div>
+        {/* Marker — vertical line + dot + "YOU" label, parked at the current
+            time within the forecast window. */}
+        {markerPct !== null && (
+          <div
+            className="pointer-events-none absolute top-0 bottom-2 flex -translate-x-1/2 flex-col items-center transition-[left] duration-1000 ease-linear motion-reduce:transition-none"
+            style={{ left: `${markerPct}%` }}
+          >
+            <span className="rounded bg-primary px-1 py-px text-[8px] font-bold uppercase leading-none tracking-wide text-primary-foreground">
+              You
+            </span>
+            <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary" />
+            <span className="w-px flex-1 bg-primary/70" />
+          </div>
+        )}
       </div>
     </section>
   );

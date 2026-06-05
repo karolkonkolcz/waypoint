@@ -17,6 +17,11 @@ interface Props {
   routes: MapRoute[];
   className?: string;
   interactive?: boolean;
+  /**
+   * Show MapLibre's built-in (interactive) attribution control. Off for the
+   * decorative dashboard hero, which renders a small static credit instead.
+   */
+  attribution?: boolean;
   /** When set, clicking the map reports the tapped coordinates (pick mode). */
   onPick?: (lat: number, lon: number) => void;
   /** A pin to display, e.g. the currently picked location. */
@@ -53,7 +58,7 @@ function ensurePmtilesProtocol() {
   pmtilesRegistered = true;
 }
 
-export function MapView({ routes, className, interactive = true, onPick, marker }: Props) {
+export function MapView({ routes, className, interactive = true, attribution = true, onPick, marker }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markerRef = useRef<maplibregl.Marker | null>(null);
@@ -70,7 +75,7 @@ export function MapView({ routes, className, interactive = true, onPick, marker 
       center: [19, 48.7], // Slovakia-ish default until fitBounds kicks in
       zoom: 5,
       interactive,
-      attributionControl: { compact: true },
+      attributionControl: attribution ? { compact: true } : false,
     });
     if (interactive) {
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
