@@ -58,8 +58,11 @@ export default function RadarMap({ lat, lon }: Props) {
       // Radar tiles carry no data above zoom 7 — lock so they never upscale.
       maxZoom: RAINVIEWER_MAX_ZOOM,
       minZoom: 3,
-      attributionControl: { compact: true },
+      // Attribution at top-right so the required "Rain Viewer" credit doesn't
+      // sit under the play/scrub bar at the bottom of the map.
+      attributionControl: false,
     });
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'top-right');
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     new maplibregl.Marker({ color: '#2563eb' }).setLngLat([lon, lat]).addTo(map);
     map.on('load', () => {

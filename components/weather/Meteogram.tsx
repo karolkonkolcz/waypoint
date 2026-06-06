@@ -262,7 +262,7 @@ export default function Meteogram({ data }: Props) {
     const width = container.clientWidth || 320;
     const wrappers: HTMLDivElement[] = [];
 
-    panels.forEach((panel, i) => {
+    panels.forEach((panel) => {
       const wrap = document.createElement('div');
       wrap.className = 'mb-2';
       const title = document.createElement('p');
@@ -272,8 +272,9 @@ export default function Meteogram({ data }: Props) {
       wrap.append(title, root);
       container.appendChild(wrap);
       wrappers.push(wrap);
-      // Only the bottom-most panel carries the time-axis labels.
-      plotsRef.current.push(panel.build(root, width, sync, i === panels.length - 1));
+      // Every panel carries the time-axis labels so each stays readable on its
+      // own while scrolling the stack.
+      plotsRef.current.push(panel.build(root, width, sync, true));
     });
 
     const ro = new ResizeObserver(() => {
