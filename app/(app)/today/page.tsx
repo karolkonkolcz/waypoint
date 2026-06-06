@@ -342,6 +342,16 @@ export default function TodayPage() {
       {/* Block 3 — One-line summary */}
       <p className="rounded-2xl border bg-card p-3 text-base leading-snug">{summary}</p>
 
+      {/* Block 3.5 — Stage notes (date-aware via todayStage) */}
+      {todayStage.notes && (
+        <section className="rounded-2xl border bg-card p-4">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Notes
+          </h2>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">{todayStage.notes}</p>
+        </section>
+      )}
+
       {/* Block 4 — To-do list */}
       <TodoList
         trailId={activeTrail.id}
