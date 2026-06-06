@@ -35,9 +35,11 @@ function timeAxis(showLabels: boolean): uPlot.Axis {
     stroke: axisStroke,
     grid: { stroke: gridStroke, width: 1 },
     ticks: { stroke: gridStroke, width: 1 },
-    space: 48,
+    // Tight spacing so a midday clock tick fits between day boundaries on a
+    // 4-day phone-width axis (24h-only ticks would show dates but no time).
+    space: 30,
     incrs: [3600, 6 * 3600, 12 * 3600, 24 * 3600],
-    // Day boundaries get a date label; other 6-hour ticks show the hour.
+    // Day boundaries get a date label; intermediate ticks show the clock time.
     values: showLabels
       ? (_u, splits) =>
           splits.map((s) => {
@@ -45,7 +47,7 @@ function timeAxis(showLabels: boolean): uPlot.Axis {
             const h = d.getHours();
             if (h === 0)
               return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' });
-            return `${String(h).padStart(2, '0')}h`;
+            return `${String(h).padStart(2, '0')}:00`;
           })
       : () => [],
   };
