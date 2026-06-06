@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeftIcon } from 'lucide-react';
 import { trailRepo } from '@/lib/db/repositories/trail.repo';
@@ -21,17 +21,22 @@ const MapView = dynamic(() => import('@/components/map/MapView').then((m) => m.M
 
 export default function TrailMapPage() {
   const { trailId } = useParams<{ trailId: string }>();
+  // Optional ?stage=<id> narrows the map to a single day; absent = whole trek.
+  const stageId = useSearchParams().get('stage');
 
   const trail = useLiveQuery(() => trailRepo.findById(trailId), [trailId]);
   const stages = useLiveQuery(() => stageRepo.findByTrail(trailId), [trailId]);
   const routes = useLiveQuery(() => routeRepo.findAllByTrail(trailId), [trailId]);
+
+  const focusedStage = stageId ? stages?.find((s) => s.id === stageId) : undefined;
 
   const mapRoutes: MapRoute[] = useMemo(() => {
     if (!stages || !routes) return [];
     const byStage = new Map(
       routes.filter((r) => r.stage_id).map((r) => [r.stage_id as string, r]),
     );
-    return stages
+    const visibleStages = stageId ? stages.filter((s) => s.id === stageId) : stages;
+    return visibleStages
       .map((s): MapRoute | null => {
         const route = byStage.get(s.id);
         if (!route) return null;
@@ -41,7 +46,7 @@ export default function TrailMapPage() {
         return { id: route.id, geojson: route.geojson, color };
       })
       .filter((x): x is MapRoute => x !== null);
-  }, [stages, routes]);
+  }, [stages, routes, stageId]);
 
   return (
     <div className="fixed inset-0 flex flex-col bg-background">
@@ -52,7 +57,11 @@ export default function TrailMapPage() {
         >
           <ArrowLeftIcon className="h-5 w-5" />
         </Link>
-        <span className="truncate text-sm font-medium">{trail?.name ?? 'Map'}</span>
+        <span className="truncate text-sm font-medium">
+          {focusedStage
+            ? focusedStage.title || `Day ${focusedStage.order_index + 1}`
+            : trail?.name ?? 'Map'}
+        </span>
       </header>
 
       <div className="relative flex-1">
