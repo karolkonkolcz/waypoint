@@ -52,3 +52,59 @@ export async function searchPlaces(
 export function formatPlace(r: GeocodeResult): string {
   return [r.name, r.admin1, r.country].filter(Boolean).join(', ');
 }
+
+// ---------------------------------------------------------------------------
+// Reverse geocoding — coordinates → place name, for the /weather page header.
+// Open-Meteo's geocoding API is forward-only (name → coords), so this uses
+// BigDataCloud's client endpoint (keyless, CORS-enabled, built for browser use).
+// ---------------------------------------------------------------------------
+
+export interface ReverseGeocodeResult {
+  /** Best human label: town/village, else the wider area, else country. */
+  place: string | null;
+  region: string | null; // admin1 / principal subdivision
+  country: string | null;
+}
+
+interface BigDataCloudResponse {
+  city?: string;
+  locality?: string;
+  principalSubdivision?: string;
+  countryName?: string;
+}
+
+/**
+ * Resolve coordinates to a place name. Prefers the most specific populated
+ * place (city → locality); in rural / unpopulated terrain those are blank, so
+ * it falls back to the region (principal subdivision), then the country. Throws
+ * on network/HTTP failure so the caller can simply hide the label.
+ */
+export async function reverseGeocode(
+  lat: number,
+  lon: number,
+  signal?: AbortSignal,
+): Promise<ReverseGeocodeResult> {
+  const url = new URL('https://api.bigdatacloud.net/data/reverse-geocode-client');
+  url.searchParams.set('latitude', lat.toFixed(4));
+  url.searchParams.set('longitude', lon.toFixed(4));
+  url.searchParams.set('localityLanguage', 'en');
+
+  const res = await fetch(url.toString(), { signal });
+  if (!res.ok) throw new Error(`Reverse geocoding error: ${res.status}`);
+  const d = (await res.json()) as BigDataCloudResponse;
+
+  const region = d.principalSubdivision || null;
+  const country = d.countryName || null;
+  // Rural fallback chain: populated place → region (area) → country.
+  const place = d.city || d.locality || region || country;
+
+  return { place, region, country };
+}
+
+/** Display label for a reverse-geocode hit, e.g. "Ústí nad Labem, Czechia". */
+export function formatReverse(r: ReverseGeocodeResult): string {
+  const parts: string[] = [];
+  if (r.place) parts.push(r.place);
+  if (r.country && r.country !== r.place) parts.push(r.country);
+  return parts.join(', ');
+}
