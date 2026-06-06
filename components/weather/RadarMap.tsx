@@ -58,11 +58,10 @@ export default function RadarMap({ lat, lon }: Props) {
       // Radar tiles carry no data above zoom 7 — lock so they never upscale.
       maxZoom: RAINVIEWER_MAX_ZOOM,
       minZoom: 3,
-      // Attribution at top-right so the required "Rain Viewer" credit doesn't
-      // sit under the play/scrub bar at the bottom of the map.
-      attributionControl: false,
+      // Compact attribution stays bottom-right (small "i"); the scrub bar below
+      // is shortened to leave it room, and the timestamp lives top-left.
+      attributionControl: { compact: true },
     });
-    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'top-right');
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     new maplibregl.Marker({ color: '#2563eb' }).setLngLat([lon, lat]).addTo(map);
     map.on('load', () => {
@@ -147,7 +146,7 @@ export default function RadarMap({ lat, lon }: Props) {
 
       {/* Play/pause + scrub controls (bottom bar). */}
       {frames.length > 0 && (
-        <div className="absolute inset-x-2 bottom-2 flex items-center gap-2 rounded-xl bg-card/90 px-2 py-1.5 backdrop-blur">
+        <div className="absolute bottom-2 left-2 right-11 flex items-center gap-2 rounded-xl bg-card/90 px-2 py-1.5 backdrop-blur">
           <button
             type="button"
             onClick={() => setPlaying((p) => !p)}
