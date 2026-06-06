@@ -1,6 +1,7 @@
 import Dexie, { type Table } from 'dexie';
 import type { GeoJSONLineString } from '@/lib/domain/geo';
 import type { WeatherAlert } from '@/lib/alerts/meteoalarm';
+import type { OpenMeteoForecast } from '@/lib/weather/types';
 
 type Sync = {
   created_at: string;
@@ -128,6 +129,16 @@ export interface AlertCacheRow {
   fetched_at: string;
 }
 
+// Ephemeral, local-only cache for the /weather page's current-position
+// forecast. NOT user content: never synced to Supabase, no RLS, no _dirty.
+// It is a read-through cache keyed by coarse (~1 km) coordinates and pruned
+// after 24 h. Distinct from `weather` (trail-scoped, route-aware, synced cache).
+export interface EphemeralWeatherRow {
+  cacheKey: string; // "{lat2}:{lon2}" — coordinates rounded to 2dp (~1 km)
+  forecast: OpenMeteoForecast;
+  fetched_at: number; // Date.now()
+}
+
 export interface SyncOp {
   seq?: number;
   entity: string;
@@ -144,6 +155,7 @@ class WaypointDB extends Dexie {
   weather!: Table<WeatherRow, string>;
   alerts!: Table<AlertCacheRow, string>;
   todos!: Table<TodoRow, string>;
+  ephemeral_weather!: Table<EphemeralWeatherRow, string>;
   syncQueue!: Table<SyncOp, number>;
 
   constructor() {
@@ -212,6 +224,13 @@ class WaypointDB extends Dexie {
     // backs the "N left" count; stage_id index backs per-day pinning.
     this.version(6).stores({
       todos: 'id, trail_id, stage_id, [trail_id+done], _dirty',
+    });
+
+    // v7: ephemeral current-position weather cache for the /weather page.
+    // Local-only (not synced) — primary key is a coarse coordinate cacheKey,
+    // fetched_at indexed for staleness checks and 24 h pruning.
+    this.version(7).stores({
+      ephemeral_weather: '&cacheKey, fetched_at',
     });
   }
 }
