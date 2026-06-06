@@ -58,9 +58,9 @@ export default function RadarMap({ lat, lon }: Props) {
       // Radar tiles carry no data above zoom 7 — lock so they never upscale.
       maxZoom: RAINVIEWER_MAX_ZOOM,
       minZoom: 3,
-      // Compact attribution stays bottom-right (small "i"); the scrub bar below
-      // is shortened to leave it room, and the timestamp lives top-left.
-      attributionControl: { compact: true },
+      // No on-map attribution — it's rendered as a static credit line below the
+      // map so it never overlaps the timestamp or the scrub bar.
+      attributionControl: false,
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     new maplibregl.Marker({ color: '#2563eb' }).setLngLat([lon, lat]).addTo(map);
@@ -136,39 +136,54 @@ export default function RadarMap({ lat, lon }: Props) {
     : '—';
 
   return (
-    <div className="relative h-72 w-full overflow-hidden rounded-2xl border bg-card">
-      <div ref={containerRef} className="h-full w-full" />
+    <div className="space-y-1">
+      <div className="relative h-72 w-full overflow-hidden rounded-2xl border bg-card">
+        <div ref={containerRef} className="h-full w-full" />
 
-      {/* Frame timestamp overlay (top-left). */}
-      <div className="pointer-events-none absolute left-2 top-2 rounded-lg bg-card/85 px-2 py-1 text-xs font-medium backdrop-blur">
-        {failed ? 'Radar unavailable' : `Radar · ${currentTime}`}
+        {/* Frame timestamp overlay (top-left). */}
+        <div className="pointer-events-none absolute left-2 top-2 rounded-lg bg-card/85 px-2 py-1 text-xs font-medium backdrop-blur">
+          {failed ? 'Radar unavailable' : `Radar · ${currentTime}`}
+        </div>
+
+        {/* Play/pause + scrub controls (bottom bar). */}
+        {frames.length > 0 && (
+          <div className="absolute inset-x-2 bottom-2 flex items-center gap-2 rounded-xl bg-card/90 px-2 py-1.5 backdrop-blur">
+            <button
+              type="button"
+              onClick={() => setPlaying((p) => !p)}
+              aria-label={playing ? 'Pause radar' : 'Play radar'}
+              className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-muted active:scale-95"
+            >
+              {playing ? <PauseIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={frames.length - 1}
+              value={index}
+              onChange={(e) => {
+                setPlaying(false);
+                setIndex(Number(e.target.value));
+              }}
+              className="flex-1 accent-primary"
+              aria-label="Radar frame"
+            />
+          </div>
+        )}
       </div>
 
-      {/* Play/pause + scrub controls (bottom bar). */}
-      {frames.length > 0 && (
-        <div className="absolute bottom-2 left-2 right-11 flex items-center gap-2 rounded-xl bg-card/90 px-2 py-1.5 backdrop-blur">
-          <button
-            type="button"
-            onClick={() => setPlaying((p) => !p)}
-            aria-label={playing ? 'Pause radar' : 'Play radar'}
-            className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-muted active:scale-95"
-          >
-            {playing ? <PauseIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}
-          </button>
-          <input
-            type="range"
-            min={0}
-            max={frames.length - 1}
-            value={index}
-            onChange={(e) => {
-              setPlaying(false);
-              setIndex(Number(e.target.value));
-            }}
-            className="flex-1 accent-primary"
-            aria-label="Radar frame"
-          />
-        </div>
-      )}
+      {/* Attribution placed below the map (required Rain Viewer link + basemap). */}
+      <p className="px-1 text-right text-[10px] leading-tight text-muted-foreground">
+        <a
+          href="https://www.rainviewer.com"
+          target="_blank"
+          rel="noreferrer"
+          className="hover:underline"
+        >
+          Rain Viewer
+        </a>
+        {MAPTILER_KEY ? ' · © MapTiler © OpenStreetMap contributors' : ''}
+      </p>
     </div>
   );
 }
