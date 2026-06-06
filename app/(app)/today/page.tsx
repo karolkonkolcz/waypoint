@@ -277,7 +277,7 @@ export default function TodayPage() {
       ) : (
         <div>
           <Link
-            href={`/trails/${activeTrail.id}/map`}
+            href={`/trails/${activeTrail.id}/map?stage=${todayStage.id}`}
             className="relative block h-44 overflow-hidden rounded-2xl border bg-card"
           >
             {mapRoutes.length > 0 ? (
@@ -295,7 +295,7 @@ export default function TodayPage() {
               {getGreeting(new Date(), name)}
             </span>
 
-            {/* Tap affordance — the hero opens the full map. */}
+            {/* Tap affordance — the hero opens today's stage on the map. */}
             <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-card/85 px-2 py-1 text-[11px] font-medium backdrop-blur">
               <MapIcon className="h-3 w-3" />
               Open map

@@ -252,10 +252,10 @@ export default function StagePage() {
                   Map
                 </h2>
                 <Link
-                  href={`/trails/${trailId}/map`}
+                  href={`/trails/${trailId}/map?stage=${stageId}`}
                   className="text-xs text-primary hover:underline"
                 >
-                  Full map
+                  Open map
                 </Link>
               </div>
               <MapView routes={stageMapRoutes} className="h-56 w-full" />
