@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ListIcon, SettingsIcon, SunriseIcon } from 'lucide-react';
+import { CloudSunIcon, ListIcon, SettingsIcon, SunriseIcon } from 'lucide-react';
 import { SyncProvider } from '@/components/sync/SyncProvider';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -12,6 +12,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="mx-auto flex max-w-lg items-center justify-around px-4 py-2">
           <NavItem href="/" icon={<ListIcon className="h-5 w-5" />} label="Trails" />
           <NavItem href="/today" icon={<SunriseIcon className="h-5 w-5" />} label="Today" />
+          <NavItem href="/weather" icon={<CloudSunIcon className="h-5 w-5" />} label="Weather" />
           <NavItem href="/settings" icon={<SettingsIcon className="h-5 w-5" />} label="Settings" />
         </div>
       </nav>
