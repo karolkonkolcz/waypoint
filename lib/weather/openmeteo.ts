@@ -41,10 +41,14 @@ export async function fetchOpenMeteo(
  * Open-Meteo accepts comma-separated latitude/longitude lists and returns an
  * array (a single object when only one point is given — normalized here).
  * Used to sample weather along a route at the positions a hiker will reach.
+ * Pass `endDate` (defaults to `date`) to also pull the next day's early hours,
+ * which the route-aware snapshot uses for evening/night weather at the
+ * destination.
  */
 export async function fetchOpenMeteoMulti(
   points: { lat: number; lon: number }[],
   date: string,
+  endDate: string = date,
 ): Promise<OpenMeteoResult[]> {
   if (points.length === 0) return [];
 
@@ -54,7 +58,7 @@ export async function fetchOpenMeteoMulti(
   url.searchParams.set('hourly', 'temperature_2m,precipitation,windspeed_10m,weathercode');
   url.searchParams.set('timezone', 'auto');
   url.searchParams.set('start_date', date);
-  url.searchParams.set('end_date', date);
+  url.searchParams.set('end_date', endDate);
 
   const res = await fetch(url.toString());
   if (!res.ok) throw new Error(`Open-Meteo API error: ${res.status}`);

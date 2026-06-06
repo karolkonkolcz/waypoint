@@ -31,7 +31,7 @@ const profile: ElevationPoint[] = [
 ];
 
 describe('buildRouteSnapshot', () => {
-  it('produces an hourly moving forecast across the hiking window', () => {
+  it('produces a three-phase forecast across the whole day', () => {
     const results = [
       makeResult(0, 0, () => 0), // start — dry
       makeResult(0, 0.09, () => 0), // mid — dry
@@ -40,11 +40,34 @@ describe('buildRouteSnapshot', () => {
     const snap = buildRouteSnapshot({ results, route, elevationProfile: profile, paceKmh: 5, startHour: 8, date: '2026-06-05' });
 
     expect(snap.moving).toBeDefined();
-    // ETA 5h → hours 8..13 inclusive = 6 entries.
-    expect(snap.moving!.map((m) => m.hour)).toEqual([8, 9, 10, 11, 12, 13]);
-    // Position advances along the route through the day.
-    const kms = snap.moving!.map((m) => m.km);
+    // ETA 5h → arrival at 13:00; moving phase is 8..13 inclusive.
+    expect(snap.startHour).toBe(8);
+    expect(snap.arrivalHour).toBe(13);
+    expect(snap.moving!.filter((m) => m.phase === 'moving').map((m) => m.hour)).toEqual([8, 9, 10, 11, 12, 13]);
+    // Before departure: start point (km 0); after arrival: destination (full km).
+    expect(snap.moving!.filter((m) => m.phase === 'start').map((m) => m.hour)).toEqual([6, 7]);
+    expect(snap.moving!.filter((m) => m.phase === 'start').every((m) => m.km === 0)).toBe(true);
+    const ends = snap.moving!.filter((m) => m.phase === 'end');
+    expect(ends.length).toBeGreaterThan(0);
+    expect(ends.every((m) => m.km > 18)).toBe(true);
+    // Position advances monotonically through the moving phase.
+    const kms = snap.moving!.filter((m) => m.phase === 'moving').map((m) => m.km);
     for (let i = 1; i < kms.length; i++) expect(kms[i]).toBeGreaterThanOrEqual(kms[i - 1]);
+    expect(snap.rainStartsHour).toBeNull();
+  });
+
+  it('reads start/end phases from the start and end points, not the route position', () => {
+    // Rain only at the START point, only before departure (06:00–07:00).
+    const results = [
+      makeResult(0, 0, (h) => (h < 8 ? 3 : 0)),
+      makeResult(0, 0.09, () => 0),
+      makeResult(0, 0.18, () => 0),
+    ];
+    const snap = buildRouteSnapshot({ results, route, elevationProfile: profile, paceKmh: 5, startHour: 8, date: '2026-06-05' });
+
+    // Start phase reflects the start point's rain…
+    expect(snap.moving!.find((m) => m.hour === 6)!.precipMm).toBe(3);
+    // …but the journey itself stays dry, so rainStarts is null.
     expect(snap.rainStartsHour).toBeNull();
   });
 

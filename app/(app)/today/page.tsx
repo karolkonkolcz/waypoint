@@ -47,6 +47,13 @@ function localToday(): string {
   ).padStart(2, '0')}`;
 }
 
+/** The calendar day after `date` (YYYY-MM-DD), for night weather at the destination. */
+function nextDay(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
 /** Day start hour for ETA projection — trail preference, default 08:00. */
 function getStartHour(preferences: Record<string, unknown>): number {
   const v = preferences?.start_hour;
@@ -163,7 +170,9 @@ export default function TodayPage() {
       const points = samplePoints(route.geojson, 6).map(([lon, lat]) => ({ lat, lon }));
       const mid = points[Math.floor((points.length - 1) / 2)];
       setFetchingWeather(true);
-      fetchOpenMeteoMulti(points, targetDate)
+      // Pull the next day's early hours too — the snapshot's "end" phase shows
+      // evening/night weather at the destination.
+      fetchOpenMeteoMulti(points, targetDate, nextDay(targetDate))
         .then((results) =>
           weatherRepo.save({
             trail_id: activeTrail.id,

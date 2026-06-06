@@ -52,8 +52,8 @@ describe('buildDaySummary', () => {
     const s = {
       ...snapshot([entry(8, 0), entry(12, 0), entry(16, 0)], 2),
       moving: [
-        { hour: 8, km: 0, lat: 0, lon: 0, tempC: 12, precipMm: 0, windKmh: 5, condition: 'clear' as const },
-        { hour: 13, km: 9, lat: 0, lon: 0, tempC: 14, precipMm: 1.5, windKmh: 8, condition: 'rain' as const },
+        { hour: 8, km: 0, lat: 0, lon: 0, tempC: 12, precipMm: 0, windKmh: 5, condition: 'clear' as const, phase: 'moving' as const },
+        { hour: 13, km: 9, lat: 0, lon: 0, tempC: 14, precipMm: 1.5, windKmh: 8, condition: 'rain' as const, phase: 'moving' as const },
       ],
       rainStartsHour: 13,
       rainStartsKm: 9,
@@ -64,7 +64,7 @@ describe('buildDaySummary', () => {
   it('says dry all day for a moving snapshot with no rain', () => {
     const s = {
       ...snapshot([entry(8, 0)], 0),
-      moving: [{ hour: 8, km: 0, lat: 0, lon: 0, tempC: 12, precipMm: 0, windKmh: 5, condition: 'clear' as const }],
+      moving: [{ hour: 8, km: 0, lat: 0, lon: 0, tempC: 12, precipMm: 0, windKmh: 5, condition: 'clear' as const, phase: 'moving' as const }],
       rainStartsHour: null,
       rainStartsKm: null,
     };
