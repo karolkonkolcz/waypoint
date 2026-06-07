@@ -75,6 +75,11 @@ Each is binding for the MVP.
 | D7 | Offline-first vs. email OTP auth (auth needs network). | Auth (sign-in) requires network **once** to receive and verify the one-time email code. After that the Supabase session is persisted and the app is fully usable offline; sync resumes when online. |
 | D8 | Offline map tiles undefined — the single biggest technical risk. | Recommend **PMTiles** per-trail region download (see §7.3). Do **not** scrape raw OSM tiles (violates the OSM tile usage policy and is fragile offline). |
 | D9 | Multi-device sync / conflict resolution undefined. | **Last-write-wins by `updated_at`**, justified because every row is owned by exactly one user. Soft deletes via `deleted_at` tombstones. Client-generated **UUIDv7** IDs so offline creation never collides. |
+| D10 | Not every day of a thru-hike is a hiking day (travel to/from the trailhead, rest days). | Add a **`stage_type`** discriminator (`'trek'` \| `'transit'`). A *trek* day has distance/ascent/route/weather; a *transit* day instead carries an editable **`timeline`** (jsonb array of milestones — bus/train/flight/transfer/checkin/meal/note) and an optional **`location_lat/lon/name`** anchor for weather (it has no route midpoint). One `stages` table, not a second entity. See `0005`. |
+| D11 | A stage's calendar date is derived from `trail.start_date + order_index`, but rest days / schedule drift break that 1:1 mapping. | Add a nullable per-stage **`date`** override. NULL = derive as before; an explicit value pins that one day without disturbing neighbours. Derivation lives in `lib/domain/stageDate.ts` (UTC-safe). See `0006`. |
+| D12 | Hikers carry a mental checklist (resupply, book a hut, charge battery) that belongs to a day, not a route. | Add a synced **`todos`** table — lightweight reminders optionally pinned to a stage and/or date, surfaced on the Today dashboard. Same offline-first ownership/sync shape as other entities. See `0007`. |
+| D13 | The Home hero and trail cards look bare without imagery. | Trails carry an optional **`cover_image_url`**; images are resized + re-encoded to **WebP client-side** and uploaded to a public Supabase Storage bucket (`trail-covers`) scoped to the owner's folder by RLS. See `0008`, `0009`, `0011`. |
+| D14 | The public welcome screen needs curated photography that non-developers can manage. | Admin-managed **`welcome_photos`** + an **`admin_users`** table and `is_admin()` helper; public read of active photos, admin-only writes, backed by a `welcome-photos` storage bucket. See `0010`. |
 
 ---
 
@@ -84,45 +89,83 @@ Each is binding for the MVP.
 waypoint/
 ├─ app/
 │  ├─ (auth)/
-│  │  └─ login/page.tsx              # online-only; email OTP code
-│  ├─ (app)/
-│  │  ├─ page.tsx                    # Home — trail list (Priority: navigation)
-│  │  ├─ trails/[trailId]/
-│  │  │  ├─ page.tsx                 # Trail overview + today's stage
-│  │  │  ├─ stages/[stageId]/page.tsx# Daily Stage screen (PRIMARY screen)
-│  │  │  └─ map/page.tsx             # Map (dynamic import only)
-│  │  └─ settings/page.tsx
-│  ├─ layout.tsx                     # app shell, registers SW
-│  ├─ manifest.ts                    # PWA manifest (route-generated)
+│  │  └─ login/                      # online-only; email OTP code
+│  │     ├─ page.tsx
+│  │     ├─ OtpLoginForm.tsx
+│  │     └─ actions.ts
+│  ├─ (app)/                         # authenticated shell (TabBar + sync)
+│  │  ├─ page.tsx                    # Home — trail list + active-trek hero
+│  │  ├─ today/page.tsx             # Daily dashboard (active trek, moving forecast, todos)
+│  │  ├─ weather/page.tsx           # Current-position weather + meteogram + radar
+│  │  ├─ trails/
+│  │  │  ├─ new/page.tsx            # Manual new-trail form
+│  │  │  └─ [trailId]/
+│  │  │     ├─ page.tsx             # Trail overview + stage list
+│  │  │     ├─ stages/[stageId]/page.tsx  # Daily Stage screen (PRIMARY screen)
+│  │  │     └─ map/page.tsx         # Map (dynamic import only)
+│  │  ├─ account/                   # Profile + sign-out (page.tsx + actions.ts)
+│  │  ├─ settings/page.tsx
+│  │  ├─ admin/welcome-photos/page.tsx   # Admin: manage welcome-screen photos
+│  │  └─ layout.tsx                 # app shell: TabBar, SyncProvider, SW register
+│  ├─ welcome/page.tsx              # Public marketing/welcome screen (guests)
+│  ├─ onboarding/page.tsx           # First-run onboarding (post sign-in)
+│  ├─ layout.tsx                    # root layout, fonts, metadata
+│  ├─ globals.css                   # design tokens (oklch palette, difficulty colors)
+│  ├─ auth/confirm/route.ts         # OTP/magic-link confirm handler
 │  └─ api/
-│     └─ weather/route.ts            # optional thin proxy (see §6)
+│     └─ alerts/route.ts            # MeteoAlarm server proxy (see §7.4)
 ├─ components/
-│  ├─ ui/                            # shadcn/ui primitives
-│  ├─ stage/                         # StageHeader, StageStats, StageTimeline
-│  ├─ weather/                       # WeatherSummary, WeatherAlertBadge
-│  ├─ difficulty/                    # DifficultyBadge, DifficultyBar
-│  └─ map/                           # MapView (client-only, lazy)
+│  ├─ ui/                            # primitives.tsx, alert-dialog.tsx
+│  ├─ brand/                         # Waypoint logo mark
+│  ├─ nav/                           # TabBar (glass pill bottom nav)
+│  ├─ dashboard/                     # ActiveTrekHero, MovingForecast, TodoList
+│  ├─ stage/                         # StageHeader, StageStats, StageTimeline, TransitEditForm, WeatherCard
+│  ├─ weather/                       # Meteogram, RadarMap, WeatherAlertBadge, OfflineBanner, WeatherEmptyState
+│  ├─ difficulty/                    # DifficultyBadge
+│  ├─ route/                         # GpxImportZone, ElevationChart
+│  ├─ map/                           # MapView (client-only, lazy) + colors
+│  ├─ sync/                          # SyncProvider, SyncedChip
+│  ├─ welcome/                       # WelcomeHero
+│  ├─ admin/                         # WelcomePhotoManager
+│  └─ pwa/                           # RegisterSW
 ├─ lib/
 │  ├─ domain/
 │  │  ├─ difficulty.ts               # pure, deterministic, tested
 │  │  ├─ eta.ts                      # Naismith now, Tobler interface ready
-│  │  ├─ geo.ts                      # LineString interpolation, haversine
-│  │  └─ weather.ts                  # "rain-start position" logic
+│  │  ├─ geo.ts                      # LineString interpolation, haversine, bbox
+│  │  ├─ stageDate.ts                # derive/override per-stage calendar date (UTC-safe)
+│  │  ├─ activeTrail.ts              # pick the trail whose schedule covers today
+│  │  ├─ daySummary.ts               # deterministic one-line day briefing (no AI)
+│  │  └─ greeting.ts                 # time-of-day greeting
+│  ├─ weather/
+│  │  ├─ openmeteo.ts                # keyless single-day hourly fetch
+│  │  ├─ forecast.ts                 # route snapshot (start/moving/end phases)
+│  │  ├─ current-position.ts         # /weather page fetch + ephemeral cache
+│  │  ├─ geocoding.ts                # Open-Meteo place search
+│  │  ├─ rainviewer.ts               # radar frames + tiles (past only)
+│  │  ├─ offline-fallback.ts         # cached snapshot for offline /weather
+│  │  ├─ visibleSlots.ts             # trim moving forecast to hours still ahead
+│  │  └─ types.ts                    # OpenMeteoForecast, MeteogramData, GpsPosition
+│  ├─ alerts/meteoalarm.ts           # MeteoAlarm CAP normaliser (see §7.4)
 │  ├─ db/
-│  │  ├─ dexie.ts                    # IndexedDB schema
-│  │  ├─ sync.ts                     # push/pull engine
-│  │  └─ repositories/               # trailRepo, stageRepo, ... (Dexie-backed)
+│  │  ├─ dexie.ts                    # IndexedDB schema (v8)
+│  │  ├─ sync.ts                     # push/pull engine + status observable
+│  │  └─ repositories/               # trail, stage, route, waypoint, weather, alerts, todo
 │  ├─ supabase/
 │  │  ├─ client.ts                   # browser client (anon key)
 │  │  ├─ server.ts                   # server client (SSR shell / login)
 │  │  └─ types.ts                    # generated DB types
+│  ├─ storage/                       # covers.ts, welcomePhotos.ts (image upload + WebP)
+│  ├─ welcome/photos.ts              # read active welcome photo
+│  ├─ auth/                          # post-auth.ts (profile+onboarding), session.ts
+│  ├─ hooks/useSyncStatus.ts         # sync chip state
+│  ├─ format/hours.ts                # human time formatting
 │  ├─ validation/schemas.ts          # Zod schemas (shared client + server)
 │  └─ gpx/
 │     ├─ parse.ts                    # parseGPXTracks() + parseGPX() — multi-track aware
 │     └─ import.ts                   # importTrek() — trail + stages + routes in one shot
-├─ public/
-│  ├─ icons/                         # PWA icons (SVG/PNG)
-│  └─ basemap/                       # optional bundled PMTiles style
+├─ proxy.ts                          # Next.js 16 auth redirect proxy (session refresh)
+├─ public/                           # icons, favicons, brand assets, manifest
 └─ supabase/
    └─ migrations/                    # SQL migrations (this doc's §5 + §6)
 ```
@@ -174,6 +217,7 @@ create table public.trails (
   start_date       date,
   default_pace_kmh numeric(4,2) not null default 4.0,
   preferences      jsonb not null default '{}'::jsonb,
+  cover_image_url  text,                      -- public Storage URL (D13, 0008)
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now(),
   deleted_at       timestamptz
@@ -199,12 +243,18 @@ create table public.routes (
 );
 
 -- stages -----------------------------------------------------------------
+-- A stage is one day. stage_type discriminates a hiking day ('trek') from a
+-- travel/rest day ('transit'); see D10. A transit day uses timeline +
+-- location_* instead of distance/route/weather-midpoint.
 create table public.stages (
   id                uuid primary key,
   trail_id          uuid not null references public.trails(id) on delete cascade,
   user_id           uuid not null references auth.users(id) on delete cascade,
   title             text not null,
   order_index       integer not null,
+  date              date,                          -- per-stage override (D11, 0006); NULL = derive
+  stage_type        text not null default 'trek'   -- D10, 0005
+                      check (stage_type in ('trek','transit')),
   distance_km       numeric(6,2) not null,
   ascent_m          integer not null default 0,
   descent_m         integer not null default 0,
@@ -213,6 +263,10 @@ create table public.stages (
   difficulty_score  smallint check (difficulty_score between 0 and 100),
   difficulty_class  text check (difficulty_class in ('easy','moderate','hard','extreme')),
   notes             text,
+  timeline          jsonb not null default '[]'::jsonb,  -- transit-day milestones (D10, 0005)
+  location_lat      numeric(9,6),                  -- transit weather anchor (D10, 0005)
+  location_lon      numeric(9,6),
+  location_name     text,
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now(),
   deleted_at        timestamptz
@@ -253,22 +307,71 @@ create table public.weather_cache (
   deleted_at   timestamptz
 );
 
+-- todos (per-day reminders for the dashboard; see D12 + 0007) -------------
+create table public.todos (
+  id          uuid primary key,
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  trail_id    uuid not null references public.trails(id) on delete cascade,
+  stage_id    uuid references public.stages(id) on delete cascade,  -- optional pin
+  date        date,                                                 -- optional pin
+  text        text not null,
+  done        boolean not null default false,
+  order_index integer not null default 0,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  deleted_at  timestamptz
+);
+
+-- welcome screen photos (admin-managed; see D14 + 0010) ------------------
+-- admin_users gates writes; is_admin() (security definer) backs the policies.
+create table public.admin_users (
+  user_id    uuid primary key references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create table public.welcome_photos (
+  id             uuid primary key,
+  storage_path   text not null unique,
+  public_url     text not null,
+  alt_text       text not null,
+  location_label text,
+  sort_order     integer not null default 0,
+  is_active      boolean not null default true,
+  created_by     uuid references auth.users(id) on delete set null,
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now(),
+  deleted_at     timestamptz
+);
+
 -- indexes ----------------------------------------------------------------
 create index on public.trails        (user_id, updated_at);
 create index on public.routes        (trail_id);
 create index on public.routes        (stage_id);    -- added by 0004_route_per_stage
 create index on public.stages        (trail_id, order_index);
+create index on public.stages        (trail_id, stage_type);  -- added by 0005
 create index on public.waypoints     (trail_id, type);
 create index on public.weather_cache (stage_id, fetched_at);
+create index on public.todos         (trail_id);
+create index on public.todos         (stage_id);
 
 -- updated_at triggers ----------------------------------------------------
-create trigger t_profiles      before update on public.profiles      for each row execute function public.set_updated_at();
-create trigger t_trails        before update on public.trails        for each row execute function public.set_updated_at();
-create trigger t_routes        before update on public.routes        for each row execute function public.set_updated_at();
-create trigger t_stages        before update on public.stages        for each row execute function public.set_updated_at();
-create trigger t_waypoints     before update on public.waypoints     for each row execute function public.set_updated_at();
-create trigger t_weather_cache before update on public.weather_cache for each row execute function public.set_updated_at();
+create trigger t_profiles       before update on public.profiles       for each row execute function public.set_updated_at();
+create trigger t_trails         before update on public.trails         for each row execute function public.set_updated_at();
+create trigger t_routes         before update on public.routes         for each row execute function public.set_updated_at();
+create trigger t_stages         before update on public.stages         for each row execute function public.set_updated_at();
+create trigger t_waypoints      before update on public.waypoints      for each row execute function public.set_updated_at();
+create trigger t_weather_cache  before update on public.weather_cache  for each row execute function public.set_updated_at();
+create trigger t_todos          before update on public.todos          for each row execute function public.set_updated_at();
+create trigger t_welcome_photos before update on public.welcome_photos for each row execute function public.set_updated_at();
 ```
+
+> **Migrations on disk.** `0001_init`, `0002_rls`, `0004_route_per_stage`,
+> `0005_stage_type_timeline`, `0006_stage_date`, `0007_todos`,
+> `0008_trail_cover_image`, `0009_trail_covers_storage`, `0010_welcome_photos`,
+> `0011_fix_trail_cover_storage_policies`. (`0003` was an early
+> profile-on-signup trigger that is no longer used — the app now creates the
+> `profiles` row in `lib/auth/post-auth.ts` after first sign-in, so it is not
+> on disk.)
 
 ### 5.1 GPX import flow
 
@@ -342,11 +445,25 @@ create policy "own waypoints" on public.waypoints
 
 create policy "own weather" on public.weather_cache
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "own todos" on public.todos
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 ```
 
 > **Integrity note:** because `user_id` is denormalized, the app layer must set
 > it correctly on insert. The `with check` clause guarantees a client can only
 > write rows it owns even if it lies.
+
+**Welcome photos (D14)** are the one shared, non-user-owned dataset. Access is
+role-based via an `is_admin()` SQL helper (`security definer`, reads
+`admin_users`): anon + authenticated may **read active** photos; only admins may
+read-all / insert / update / delete. The `admin_users` table is admin-readable
+only.
+
+**Storage buckets** (public, RLS on `storage.objects`):
+- `trail-covers` — public read; owner-only write, scoped by the first path
+  segment `{auth.uid()}/…` (`0009`, tightened in `0011`).
+- `welcome-photos` — public read; admin-only write via `is_admin()` (`0010`).
 
 ---
 
@@ -375,8 +492,31 @@ additional sample points. Fetch the Open-Meteo hourly forecast for each point.
 when online and `fetched_at` is older than 6 h. Offline, always serve the cached
 snapshot and surface its age in the UI.
 
+**Moving forecast (Today dashboard).** `lib/weather/forecast.ts` builds a
+three-phase snapshot of the active stage (start / moving / end). At render time
+`visibleSlots.ts` trims it to the hours still *ahead* of now (the
+`MovingForecast` widget never shows hours that already passed). The deterministic
+one-line briefing on the dashboard comes from `lib/domain/daySummary.ts` — every
+clause is templated from the day's own data (no AI, per PRD Non-Goals).
+
+**Current-position weather (`/weather` page).** A standalone screen, decoupled
+from any trail: it geolocates the user (or accepts a place searched via
+`lib/weather/geocoding.ts`, keyless Open-Meteo geocoding) and renders six
+`Meteogram` panels (temperature, cloud cover, precipitation, pressure, wind,
+gusts) drawn with **uPlot**. `lib/weather/current-position.ts` fetches a richer
+hourly payload and caches it in the Dexie `ephemeral_weather` table — a
+**local-only, never-synced** read-through cache keyed by coarse (~1 km)
+coordinates, 6 h staleness, pruned after 24 h. Offline,
+`lib/weather/offline-fallback.ts` reconstructs a meteogram from the active
+trail's cached stage weather so the page still renders.
+
+**Radar overlay.** `components/weather/RadarMap.tsx` overlays RainViewer past
+radar frames (`lib/weather/rainviewer.ts`) on the map. Free tier (2026): past
+~2 h only, max zoom 7, Universal Blue scheme, attribution required, nowcast
+discontinued — the client degrades to an empty state on any failure.
+
 **Alerts (MVP):** display active warnings only (visibility, no logic). Map them
-to a single `WeatherAlertBadge`.
+to a single `WeatherAlertBadge`. See §7.4.
 
 ---
 
@@ -459,80 +599,63 @@ fetch — 30 min CDN/edge cache for the MeteoAlarm response.
 
 ## 8. On-device storage (Dexie / IndexedDB)
 
+The store mirrors the Postgres schema (§5). Synced rows carry the `Sync` mixin
+(`created_at`, `updated_at`, `deleted_at`, `_dirty`); derived/local caches do not.
+The DB is at **version 8**. Tables:
+
+| Table | Synced? | Notes |
+|-------|:------:|-------|
+| `trails` | ✅ | + `cover_image_url` (v8) |
+| `routes` | ✅ | per-stage geometry; `stage_id` indexed (v2) |
+| `stages` | ✅ | + `stage_type`/`timeline`/`location_*` (v4), `date` (v5); `stage_type` indexed |
+| `waypoints` | ✅ | |
+| `todos` | ✅ | v6; `[trail_id+done]` compound index backs the "N left" count |
+| `weather` | ❌ | trail-scoped forecast cache (`_dirty=0`, never pushed) |
+| `alerts` | ❌ | v3; MeteoAlarm warnings, keyed by `trail_id`, country-level |
+| `ephemeral_weather` | ❌ | v7; `/weather` current-position cache, coarse-coord key |
+| `syncQueue` | — | pending `SyncOp`s |
+
 ```typescript
-// lib/db/dexie.ts
-import Dexie, { type Table } from 'dexie';
-
-type Sync = { updated_at: string; deleted_at: string | null; _dirty: 0 | 1 };
-
-export interface TrailRow extends Sync {
-  id: string; user_id: string; name: string; description: string | null;
-  start_date: string | null; default_pace_kmh: number; preferences: Record<string, unknown>;
-}
-export interface RouteRow extends Sync {
-  id: string; trail_id: string; stage_id: string | null; user_id: string;
-  geojson: GeoJSON.LineString; total_distance_km: number;
-  total_ascent_m: number; total_descent_m: number;
-  elevation_profile: { d_km: number; ele_m: number }[]; source: 'gpx' | 'manual';
-  // stage_id = null reserved for future trail-level overview geometry
-}
-export interface StageRow extends Sync {
-  id: string; trail_id: string; user_id: string; title: string; order_index: number;
-  distance_km: number; ascent_m: number; descent_m: number;
-  start_distance_km: number | null; end_distance_km: number | null;
-  difficulty_score: number | null; difficulty_class: string | null; notes: string | null;
-}
-export interface WaypointRow extends Sync {
-  id: string; trail_id: string; user_id: string; name: string; type: string;
-  latitude: number; longitude: number; elevation_m: number | null;
-  distance_along_route_km: number | null; description: string | null;
-}
-export interface WeatherRow extends Sync {
-  id: string; trail_id: string; stage_id: string | null; user_id: string;
-  latitude: number; longitude: number; forecast_json: unknown;
-  valid_from: string | null; valid_to: string | null; fetched_at: string;
-}
-export interface SyncOp {
-  seq?: number; entity: string; op: 'upsert' | 'delete'; row_id: string; created_at: string;
-}
-
-class WaypointDB extends Dexie {
-  trails!: Table<TrailRow, string>;
-  routes!: Table<RouteRow, string>;
-  stages!: Table<StageRow, string>;
-  waypoints!: Table<WaypointRow, string>;
-  weather!: Table<WeatherRow, string>;
-  syncQueue!: Table<SyncOp, number>;
-
-  constructor() {
-    super('waypoint');
-    this.version(1).stores({
-      trails:    'id, user_id, updated_at, _dirty',
-      routes:    'id, trail_id, _dirty',
-      stages:    'id, trail_id, order_index, _dirty',
-      waypoints: 'id, trail_id, type, _dirty',
-      weather:   'id, trail_id, stage_id, fetched_at',
-      syncQueue: '++seq, entity, created_at',
-    });
-    // v2: route per stage — adds stage_id index; backfills existing rows to null
-    this.version(2).stores({ routes: 'id, trail_id, stage_id, _dirty' })
-      .upgrade(tx => tx.table('routes').toCollection().modify(r => {
-        if (r.stage_id === undefined) r.stage_id = null;
-      }));
-  }
-}
-
-export const db = new WaypointDB();
+// lib/db/dexie.ts (abridged — see file for full row interfaces)
+this.version(1).stores({
+  trails:    'id, user_id, updated_at, _dirty',
+  routes:    'id, trail_id, _dirty',
+  stages:    'id, trail_id, order_index, _dirty',
+  waypoints: 'id, trail_id, type, _dirty',
+  weather:   'id, trail_id, stage_id, fetched_at',
+  syncQueue: '++seq, entity, created_at',
+});
+this.version(2).stores({ routes: 'id, trail_id, stage_id, _dirty' })   // route per stage
+  .upgrade(/* backfill stage_id = null */);
+this.version(3).stores({ alerts: 'trail_id, fetched_at' });            // MeteoAlarm cache
+this.version(4).stores({ stages: 'id, trail_id, order_index, stage_type, _dirty' })
+  .upgrade(/* backfill stage_type='trek', timeline=[], location_*=null */);
+this.version(5).upgrade(/* backfill stages.date = null */);            // per-stage date
+this.version(6).stores({ todos: 'id, trail_id, stage_id, [trail_id+done], _dirty' });
+this.version(7).stores({ ephemeral_weather: '&cacheKey, fetched_at' });
+this.version(8).upgrade(/* backfill trails.cover_image_url = null */);
 ```
 
-The **repositories** layer (`lib/db/repositories/*`) is the only code the UI
-talks to. A repo write updates Dexie, sets `_dirty = 1`, and enqueues a `SyncOp`.
+**Migration discipline:** every additive column ships a `version(N).upgrade()`
+that backfills existing rows so an older client's IndexedDB never has `undefined`
+fields after the app updates.
+
+The **repositories** layer (`lib/db/repositories/*` — trail, stage, route,
+waypoint, weather, alerts, todo) is the only code the UI talks to. A repo write
+updates Dexie, sets `_dirty = 1`, and enqueues a `SyncOp`.
 
 ---
 
 ## 9. Sync engine (`lib/db/sync.ts`)
 
 Single-user-per-row ownership makes this simple. No CRDTs needed.
+
+**Syncable entities:** `trails`, `routes`, `stages`, `waypoints`, `todos`. The
+`weather`, `alerts`, and `ephemeral_weather` tables are derived caches and are
+**never pushed or pulled** — they are re-fetched from their upstream APIs. The
+push path strips only `_dirty` and upserts the whole row, so a new synced column
+flows to Supabase automatically *once the matching SQL migration is applied to
+the remote* (otherwise the upsert errors on the unknown column).
 
 **Push** (online): drain `syncQueue` → `supabase.upsert(row)` (or set
 `deleted_at` for deletes). On success, clear `_dirty` and remove the queue op.

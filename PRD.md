@@ -245,8 +245,16 @@ Fields:
 - descent
 - notes
 
-Stages may optionally map onto the route via start/end distance offsets to
-enable position interpolation for ETA and weather.
+Each stage is one day and has a type:
+
+- **trek** — a hiking day (distance, ascent, descent, route, ETA, weather).
+- **transit** — a travel/rest day, planned as an editable timeline of
+  milestones (bus, train, flight, transfer, check-in, meal, note) with an
+  optional location anchor for weather.
+
+A stage's date derives from the trail start date plus its order, and can be
+overridden per stage. Each trek stage owns its own route (from one `<trk>` in
+the imported GPX), so no manual distance offsets are needed.
 
 ---
 
@@ -363,6 +371,52 @@ from cached geometry.
 
 ---
 
+### Daily Dashboard (Today)
+
+Included.
+
+A single screen for the active trek that answers "what is today" at a glance:
+today's stage, a one-line plain-language day briefing, a moving weather forecast
+(start → moving → end, trimmed to the hours still ahead), and the day's
+reminders.
+
+---
+
+### Reminders (To-dos)
+
+Included.
+
+Lightweight per-day to-dos, optionally pinned to a stage or date. Offline-first
+and synced like the rest of the user's data. Surfaced on the dashboard.
+
+---
+
+### Current-Position Weather
+
+Included.
+
+A standalone weather screen, independent of any trail: geolocates the user (or a
+searched place) and shows a multi-panel meteogram plus a past-radar overlay.
+Falls back to the active trail's cached forecast when offline.
+
+---
+
+### Trail Cover Photos
+
+Included.
+
+Each trail can carry a cover photo, shown on the Home hero and trail cards.
+Images are resized and converted to WebP in the browser before upload to keep
+them small (offline-friendly, slow-network-friendly).
+
+---
+
+### Localization
+
+The UI is currently presented in Czech.
+
+---
+
 ### Offline Mode
 
 Included.
@@ -408,6 +462,7 @@ description
 start_date
 default_pace_kmh
 preferences
+cover_image_url
 created_at
 updated_at
 deleted_at
@@ -418,6 +473,7 @@ deleted_at
 
 id
 trail_id
+stage_id
 user_id
 geojson
 total_distance_km
@@ -429,7 +485,9 @@ created_at
 updated_at
 deleted_at
 
-One route per trail. Stores the full track as a GeoJSON LineString.
+One route per **stage** (`stage_id`): each hiking day owns its own GeoJSON
+LineString. A null `stage_id` is reserved for a future trail-level overview
+geometry.
 
 ---
 
@@ -440,6 +498,8 @@ trail_id
 user_id
 title
 order_index
+date
+stage_type
 distance_km
 ascent_m
 descent_m
@@ -448,13 +508,21 @@ end_distance_km
 difficulty_score
 difficulty_class
 notes
+timeline
+location_lat
+location_lon
+location_name
 created_at
 updated_at
 deleted_at
 
-`start_distance_km` / `end_distance_km` map the stage onto the route for
-position interpolation. Optional — stages without them work for display and
-difficulty but not for ETA position or weather sampling.
+A stage is one day. `stage_type` is `trek` (a hiking day — distance, route,
+weather) or `transit` (a travel/rest day — focus on an editable `timeline` of
+milestones, with an optional `location_*` weather anchor). `date` overrides the
+date otherwise derived from `trail.start_date + order_index`.
+
+`start_distance_km` / `end_distance_km` are deprecated (each stage now owns its
+own route, see `routes.stage_id`); kept for compatibility only.
 
 ---
 
@@ -496,17 +564,60 @@ One row per stage per sample point. Not one blob per trail.
 
 ---
 
+### todos
+
+id
+user_id
+trail_id
+stage_id
+date
+text
+done
+order_index
+created_at
+updated_at
+deleted_at
+
+Lightweight per-day reminders surfaced on the daily dashboard. Optionally pinned
+to a stage and/or a calendar date; otherwise a trail-level reminder.
+
+---
+
+### welcome_photos / admin_users
+
+Admin-managed photography for the public welcome screen. `welcome_photos` holds
+the image metadata (storage path, public URL, alt text, sort order, active
+flag); `admin_users` gates who may upload and manage them. Public visitors can
+read active photos; only admins can write.
+
+---
+
 ## Navigation Structure
 
-**Home** — list of trails.
+**Welcome** — public landing screen for signed-out visitors (admin-curated
+photography). Routes guests here before login.
 
-**Trail** — trail overview.
+**Onboarding** — first-run setup after the first sign-in.
 
-**Stage** — daily stage details (primary screen).
+**Home** — list of trails, with an active-trek hero and a live sync indicator.
+
+**Today** — daily dashboard for the active trek: today's stage, a moving
+weather forecast, and the day's to-do list.
+
+**Trail** — trail overview + stage list.
+
+**Stage** — daily stage details (primary screen). A trek day shows
+distance/ascent/ETA/weather/map; a transit day shows an editable milestone
+timeline.
+
+**Weather** — current-position forecast (meteogram + radar), independent of any
+trail.
 
 **Map** — route visualization (code-split, secondary).
 
-**Settings** — user preferences.
+**Account / Settings** — profile, preferences, sign-out.
+
+**Admin → Welcome photos** — admin-only management of welcome-screen imagery.
 
 ---
 

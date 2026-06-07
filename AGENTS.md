@@ -59,9 +59,14 @@ The app should feel like a digital trail book.
 
 ### Maps
 
-- MapLibre
-- OpenStreetMap
-- PMTiles (offline tile bundles)
+- MapLibre GL JS
+- MapTiler vector tiles (outdoor-v2; graceful blank-canvas fallback)
+- PMTiles (offline tile bundles — deferred)
+- RainViewer (past-radar overlay)
+
+### Charts
+
+- uPlot (meteogram); elevation profile is hand-rolled SVG
 
 ### Offline Storage
 
@@ -75,7 +80,12 @@ The app should feel like a digital trail book.
 
 ### Weather
 
-- Open-Meteo
+- Open-Meteo (forecast + geocoding, keyless)
+- MeteoAlarm (weather warnings, via server proxy)
+
+### Localization
+
+- UI is currently in Czech
 
 ---
 
@@ -196,6 +206,7 @@ Contains:
 - start date
 - default hiking pace (`default_pace_kmh`)
 - preferences
+- optional cover photo (`cover_image_url`)
 
 **MVP decision:** Trail and Itinerary are merged into one entity for the MVP.
 Splitting into shared trail templates + per-user itineraries is deferred to V3.
@@ -214,20 +225,41 @@ Contains:
 - downsampled elevation profile for charts
 
 The Route is the source of truth for map rendering, ETA position interpolation,
-and weather sampling points. One route per trail.
+and weather sampling points. **One route per stage** (`stage_id`): each hiking
+day owns its own geometry from one `<trk>` in the imported GPX.
 
 ---
 
 ### Stage
 
-Represents one hiking day.
+Represents one day. A `stage_type` discriminator distinguishes:
 
-Contains:
+- **trek** — a hiking day: distance, ascent, descent; estimated hiking time
+  (ETA engine); difficulty score and class (Difficulty engine); its own route
+  and weather.
+- **transit** — a travel/rest day: an editable `timeline` of milestones
+  (bus/train/flight/transfer/check-in/meal/note) and an optional `location_*`
+  weather anchor.
 
-- distance, ascent, descent
-- estimated hiking time (derived via ETA engine)
-- difficulty score and class (derived via Difficulty engine)
-- optional start/end distance offsets onto the Route for position interpolation
+A stage's calendar date derives from `trail.start_date + order_index` and can be
+overridden per stage (`date`). The legacy start/end distance offsets are
+deprecated (superseded by per-stage routes).
+
+---
+
+### Todo
+
+A lightweight per-day reminder surfaced on the daily dashboard. Optionally pinned
+to a stage and/or a date; otherwise trail-level. Offline-first and synced like
+the other user-owned entities.
+
+---
+
+### Welcome Photo
+
+Admin-managed photography for the public welcome screen. Not user content —
+public read of active photos, admin-only writes (gated by an `admin_users`
+table). Distinct from per-trail cover photos, which are user-owned.
 
 ---
 
