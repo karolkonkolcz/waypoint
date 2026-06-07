@@ -13,7 +13,7 @@ import {
 import { trailRepo } from '@/lib/db/repositories/trail.repo';
 import { stageRepo } from '@/lib/db/repositories/stage.repo';
 import { db, type TrailRow } from '@/lib/db/dexie';
-import { createClient } from '@/lib/supabase/client';
+import { getLocalUserId } from '@/lib/auth/session';
 import { resolveActiveTrail } from '@/lib/domain/activeTrail';
 import { stageDate } from '@/lib/domain/stageDate';
 import type { DifficultyClass } from '@/lib/domain/difficulty';
@@ -38,9 +38,7 @@ export default function HomePage() {
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    createClient()
-      .auth.getUser()
-      .then(({ data }) => setUserId(data.user?.id ?? null));
+    getLocalUserId().then(setUserId);
   }, []);
 
   const trails = useLiveQuery(

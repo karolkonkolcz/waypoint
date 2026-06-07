@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState } from 'react';
 import { MapPinIcon } from 'lucide-react';
 
-import { createClient } from '@/lib/supabase/client';
+import { getLocalUserId } from '@/lib/auth/session';
 import {
   forecastToMeteogram,
   getCurrentPosition,
@@ -28,17 +28,6 @@ const RadarMap = dynamic(() => import('@/components/weather/RadarMap'), {
   ssr: false,
   loading: () => <RadarSkeleton />,
 });
-
-/** Read the logged-in user id from the locally stored session (no network, so
- *  it works offline — unlike auth.getUser which validates with the server). */
-async function getUserId(): Promise<string | null> {
-  try {
-    const { data } = await createClient().auth.getSession();
-    return data.session?.user.id ?? null;
-  } catch {
-    return null;
-  }
-}
 
 const PERMISSION_DENIED = 1; // GeolocationPositionError.PERMISSION_DENIED
 
@@ -70,7 +59,7 @@ export default function WeatherPage() {
     pruneEphemeralWeather(); // fire-and-forget cleanup
 
     const online = typeof navigator === 'undefined' ? true : navigator.onLine;
-    const userId = await getUserId();
+    const userId = await getLocalUserId();
     const fallback = async (reason: 'offline-no-cache' | 'position-unavailable' | 'fetch-failed') => {
       const fb = userId ? await getOfflineFallback(userId) : null;
       if (fb) {

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { saveDisplayName } from '@/app/(app)/account/actions';
+import { ensureSignedInProfile, saveDisplayName } from '@/app/(app)/account/actions';
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -15,6 +15,18 @@ export default function OnboardingPage() {
     setPending(true);
     setError(null);
     const result = await saveDisplayName(name);
+    if ('error' in result) {
+      setError(result.error);
+      setPending(false);
+      return;
+    }
+    router.replace('/');
+  }
+
+  async function handleSkip() {
+    setPending(true);
+    setError(null);
+    const result = await ensureSignedInProfile();
     if ('error' in result) {
       setError(result.error);
       setPending(false);
@@ -59,8 +71,9 @@ export default function OnboardingPage() {
 
         <button
           type="button"
-          onClick={() => router.replace('/')}
-          className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
+          onClick={handleSkip}
+          disabled={pending}
+          className="w-full text-center text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
         >
           Skip for now
         </button>

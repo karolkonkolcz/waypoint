@@ -14,6 +14,7 @@ import { alertsRepo } from '@/lib/db/repositories/alerts.repo';
 import { todoRepo } from '@/lib/db/repositories/todo.repo';
 import { db } from '@/lib/db/dexie';
 import { createClient } from '@/lib/supabase/client';
+import { getLocalSessionUser } from '@/lib/auth/session';
 
 import { fetchOpenMeteo, fetchOpenMeteoMulti } from '@/lib/weather/openmeteo';
 import { buildSnapshot, buildRouteSnapshot, type WeatherSnapshot } from '@/lib/weather/forecast';
@@ -66,20 +67,27 @@ export default function TodayPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [name, setName] = useState('');
 
-  // Auth + display name (network, online-only — fall back to the email prefix).
+  // Auth + display name. User id comes from the local session so Dexie reads
+  // still work offline; profile lookup is best-effort while online.
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
+    getLocalSessionUser().then(async (user) => {
       if (!user) return;
       setUserId(user.id);
       const emailName = user.email?.split('@')[0] ?? '';
       setName(emailName);
-      const { data } = await supabase
-        .from('profiles')
-        .select('display_name')
-        .eq('id', user.id)
-        .maybeSingle();
-      if (data?.display_name) setName(data.display_name);
+
+      if (!navigator.onLine) return;
+      const supabase = createClient();
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('display_name')
+          .eq('id', user.id)
+          .maybeSingle();
+        if (data?.display_name) setName(data.display_name);
+      } catch {
+        // Keep the local email fallback when the profile lookup cannot reach Supabase.
+      }
     });
   }, []);
 

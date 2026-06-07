@@ -72,7 +72,7 @@ Each is binding for the MVP.
 | D4 | PRD defines a `users` table, but Supabase already owns `auth.users`. | Use a **`profiles`** table keyed by `auth.users.id`. Never create a parallel users table. |
 | D5 | `weather_cache` as one `forecast_json` blob per trail is too coarse to answer *"where will I be when the rain starts?"* | Redesign as **per-stage, per-sample-point** forecasts (see §6). |
 | D6 | AGENTS difficulty inputs list `altitude` + `weather`; PRD lists only `distance/ascent/descent`. | MVP uses **distance/ascent/descent only** (PRD wins). The engine exposes optional altitude/weather modifiers, disabled by default. |
-| D7 | Offline-first vs. magic-link auth (auth needs network). | Auth (sign-in) requires network **once**. After that the Supabase session is persisted and the app is fully usable offline; sync resumes when online. |
+| D7 | Offline-first vs. email OTP auth (auth needs network). | Auth (sign-in) requires network **once** to receive and verify the one-time email code. After that the Supabase session is persisted and the app is fully usable offline; sync resumes when online. |
 | D8 | Offline map tiles undefined — the single biggest technical risk. | Recommend **PMTiles** per-trail region download (see §7.3). Do **not** scrape raw OSM tiles (violates the OSM tile usage policy and is fragile offline). |
 | D9 | Multi-device sync / conflict resolution undefined. | **Last-write-wins by `updated_at`**, justified because every row is owned by exactly one user. Soft deletes via `deleted_at` tombstones. Client-generated **UUIDv7** IDs so offline creation never collides. |
 
@@ -84,7 +84,7 @@ Each is binding for the MVP.
 waypoint/
 ├─ app/
 │  ├─ (auth)/
-│  │  └─ login/page.tsx              # online-only; magic link + email
+│  │  └─ login/page.tsx              # online-only; email OTP code
 │  ├─ (app)/
 │  │  ├─ page.tsx                    # Home — trail list (Priority: navigation)
 │  │  ├─ trails/[trailId]/
@@ -395,8 +395,8 @@ Use Workbox (via `next-pwa` or a hand-written SW). Strategies:
 
 Supabase persists the session in storage. On boot: if a valid session exists,
 go straight to the (local) data. If offline and no session, show a friendly
-"sign in once while online" screen. Sign-in (magic link / email) is the only
-hard online dependency.
+"sign in once while online" screen. Sign-in with an email OTP code is the
+only hard online dependency.
 
 ### 7.3 Map (F4a — implemented, F4b — deferred)
 

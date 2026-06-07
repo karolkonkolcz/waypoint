@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { getLocalUserId } from '@/lib/auth/session';
 import { sync, registerSyncTriggers } from '@/lib/db/sync';
 
 // Module-level: shared across all re-mounts, persists for the page lifetime.
@@ -18,9 +19,9 @@ export function SyncProvider() {
     });
 
     // Seed userId and kick off the first sync eagerly.
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      currentUserId = user?.id ?? null;
-      if (currentUserId) sync(currentUserId).catch(console.error);
+    getLocalUserId().then((userId) => {
+      currentUserId = userId;
+      if (currentUserId && navigator.onLine) sync(currentUserId).catch(console.error);
     });
 
     // Register window/document event listeners exactly once.

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeftIcon } from 'lucide-react';
 import Link from 'next/link';
 import { trailRepo } from '@/lib/db/repositories/trail.repo';
-import { createClient } from '@/lib/supabase/client';
+import { getLocalUserId } from '@/lib/auth/session';
 import { cn } from '@/lib/utils';
 
 const PACE_PRESETS = [
@@ -33,11 +33,11 @@ export default function NewTrailPage() {
     const start_date = (fd.get('start_date') as string) || null;
 
     try {
-      const { data } = await createClient().auth.getUser();
-      if (!data.user) { setError('Not signed in'); return; }
+      const userId = await getLocalUserId();
+      if (!userId) { setError('Not signed in'); return; }
 
       const trail = await trailRepo.create({
-        user_id: data.user.id,
+        user_id: userId,
         name,
         description,
         start_date,

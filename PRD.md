@@ -177,7 +177,7 @@ Included.
 Features:
 
 - email login
-- magic link login
+- email one-time code login
 
 No social providers initially.
 

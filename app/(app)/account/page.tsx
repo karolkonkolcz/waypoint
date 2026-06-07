@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeftIcon } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { getLocalSessionUser } from '@/lib/auth/session';
 import { saveDisplayName } from './actions';
 
 export default function AccountPage() {
@@ -15,20 +16,30 @@ export default function AccountPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
+    getLocalSessionUser().then(async (user) => {
       if (!user) {
         setLoaded(true);
         return;
       }
       setEmail(user.email ?? null);
-      const { data } = await supabase
-        .from('profiles')
-        .select('display_name')
-        .eq('id', user.id)
-        .maybeSingle();
-      setName(data?.display_name ?? '');
-      setLoaded(true);
+      if (!navigator.onLine) {
+        setLoaded(true);
+        return;
+      }
+      const supabase = createClient();
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('display_name')
+          .eq('id', user.id)
+          .maybeSingle();
+        setName(data?.display_name ?? '');
+      } catch {
+        setError('Could not load profile details.');
+        setStatus('error');
+      } finally {
+        setLoaded(true);
+      }
     });
   }, []);
 
