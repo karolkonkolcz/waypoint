@@ -1,10 +1,9 @@
 {
   "name": "Waypoint",
   "short_name": "Waypoint",
-  "description": "Your offline-first hiking itinerary companion",
+  "description": "Offline-first hiking companion",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait",
   "background_color": "#F4F4F2",
   "theme_color": "#F37013",
   "icons": [
@@ -12,7 +11,5 @@
     { "src": "/favicons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/favicons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
     { "src": "/favicons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ],
-  "categories": ["navigation", "sports"],
-  "lang": "en"
+  ]
 }

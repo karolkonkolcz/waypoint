@@ -18,16 +18,21 @@ export const viewport: Viewport = {
   initialScale: 1,
   minimumScale: 1,
   viewportFit: "cover",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#09090b" },
-  ],
+  themeColor: "#F37013",
 };
 
 export const metadata: Metadata = {
   title: "Waypoint",
   description: "Your offline-first hiking itinerary companion",
   manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/favicons/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicons/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicons/favicon-16.png", sizes: "16x16", type: "image/png" },
+    ],
+    apple: "/favicons/apple-touch-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

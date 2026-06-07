@@ -28,51 +28,40 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.141 0.005 285.75);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.141 0.005 285.75);
-  --primary: oklch(0.21 0.006 285.885);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.21 0.006 285.885);
+
+  /* ── Waypoint brand tokens (design_handoff_waypoint_logo) ── */
+  --wp-orange: #f37013;
+  --wp-orange-700: #d85f08;
+  --wp-orange-50: #fef1e6;
+  --wp-ink: #2f373d;
+  --wp-text: #1b1f22;
+  --wp-bg: #f4f4f2;
+  --wp-card: #ffffff;
+
+  /* ── Semantic tokens mapped onto the brand ── */
+  --background: var(--wp-bg);
+  --foreground: var(--wp-text);
+  --card: var(--wp-card);
+  --card-foreground: var(--wp-text);
+  --primary: var(--wp-orange);
+  --primary-foreground: #ffffff;
+  --secondary: #ecebe8;
+  --secondary-foreground: var(--wp-ink);
+  --muted: #ecebe8;
+  --muted-foreground: #6e7479;
+  --accent: var(--wp-orange-50);
+  --accent-foreground: var(--wp-orange-700);
   --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.707 0.022 261.325);
+  --destructive-foreground: #ffffff;
+  --border: #e3e2df;
+  --input: #e3e2df;
+  --ring: var(--wp-orange);
 
   /* Difficulty colours */
   --difficulty-easy: oklch(0.627 0.194 145.6);
   --difficulty-moderate: oklch(0.769 0.188 87.7);
   --difficulty-hard: oklch(0.646 0.222 41.1);
   --difficulty-extreme: oklch(0.577 0.245 27.3);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: oklch(0.141 0.005 285.75);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.21 0.006 285.885);
-    --card-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.92 0.004 286.32);
-    --primary-foreground: oklch(0.21 0.006 285.885);
-    --secondary: oklch(0.274 0.006 286.033);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.274 0.006 286.033);
-    --muted-foreground: oklch(0.705 0.015 286.067);
-    --accent: oklch(0.274 0.006 286.033);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --destructive-foreground: oklch(0.985 0 0);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.552 0.016 285.938);
-  }
 }
 
 * {
@@ -88,7 +77,7 @@ body {
   width: 100%;
   border-radius: var(--radius);
   border: 1px solid var(--input);
-  background: var(--background);
+  background: var(--card);
   padding: 0.625rem 0.875rem;
   font-size: 1rem;
   outline: none;

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 132 30" role="img" aria-label="Waypoint">
+  <title>Waypoint logo lockup</title>
+  
+  <g transform="scale(0.15) translate(-300 -100)">
+    <path d="M384 116 C424 116 452 146 452 184 C452 226 408 262 384 290 C360 262 316 226 316 184 C316 146 344 116 384 116 Z" fill="#F37013"></path>
+    <circle cx="384" cy="182" r="26" fill="#FFFFFF"></circle>
+  </g>
+  
+  <text x="33" y="15.6" dominant-baseline="middle" font-family="Geist, -apple-system, system-ui, sans-serif" font-weight="900" font-size="17" letter-spacing="-0.68" fill="#2F373D">WAYPOINT</text>
+</svg>
