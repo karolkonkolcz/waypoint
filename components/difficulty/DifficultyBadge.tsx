@@ -14,11 +14,14 @@ const LABELS: Record<DifficultyClass, string> = {
   extreme: 'Extrémní',
 };
 
+// Explicit hex values rather than Tailwind palette utilities: the v4 palette is
+// defined in oklch(), which older iOS Safari (< 16.4) can't render — badges came
+// out nearly transparent there. Hex works everywhere.
 const STYLES: Record<DifficultyClass, string> = {
-  easy:     'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-  moderate: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-  hard:     'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
-  extreme:  'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+  easy:     'bg-[#dcfce7] text-[#166534]',
+  moderate: 'bg-[#fef9c3] text-[#854d0e]',
+  hard:     'bg-[#ffedd5] text-[#9a3412]',
+  extreme:  'bg-[#fee2e2] text-[#991b1b]',
 };
 
 export function DifficultyBadge({ klass, score, size = 'md' }: Props) {

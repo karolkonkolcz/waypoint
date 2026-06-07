@@ -260,16 +260,13 @@ function TrailHeroPhoto({ trail, stageCount }: { trail: TrailRow; stageCount: nu
           )}
         </div>
 
-        <div className="max-w-[90%]">
-          <h2 className="text-3xl font-extrabold leading-tight drop-shadow-sm">
-            {trail.name}
-          </h2>
-          {trail.description && (
-            <p className="mt-2 line-clamp-2 text-sm font-medium leading-snug text-white/85">
+        {trail.description && (
+          <div className="max-w-[90%]">
+            <p className="line-clamp-2 text-sm font-medium leading-snug text-white/85 drop-shadow-sm">
               {trail.description}
             </p>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </section>
   );
