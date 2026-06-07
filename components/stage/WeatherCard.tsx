@@ -10,7 +10,7 @@ interface Props {
 }
 
 export function WeatherCard({ snapshot, loading }: Props) {
-  const dateLabel = new Date(snapshot.date + 'T12:00:00Z').toLocaleDateString('en-GB', {
+  const dateLabel = new Date(snapshot.date + 'T12:00:00Z').toLocaleDateString('cs-CZ', {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
@@ -25,7 +25,7 @@ export function WeatherCard({ snapshot, loading }: Props) {
 
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Weather
+          Počasí
         </h2>
         <span className="text-xs text-muted-foreground">{dateLabel}</span>
       </div>
@@ -53,11 +53,11 @@ export function WeatherCard({ snapshot, loading }: Props) {
       <div className="flex items-center gap-4 border-t pt-2 text-xs text-muted-foreground">
         <span className="flex items-center gap-1">
           <DropletIcon className="h-3.5 w-3.5" />
-          {snapshot.precipTotalMm > 0 ? `${snapshot.precipTotalMm} mm` : 'No rain'}
+          {snapshot.precipTotalMm > 0 ? `${snapshot.precipTotalMm} mm` : 'Bez deště'}
         </span>
         <span className="flex items-center gap-1">
           <WindIcon className="h-3.5 w-3.5" />
-          max {snapshot.windMaxKmh} km/h
+          max. {snapshot.windMaxKmh} km/h
         </span>
       </div>
     </section>

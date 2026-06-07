@@ -59,15 +59,15 @@ export default function TrailMapPage() {
         </Link>
         <span className="truncate text-sm font-medium">
           {focusedStage
-            ? focusedStage.title || `Day ${focusedStage.order_index + 1}`
-            : trail?.name ?? 'Map'}
+            ? focusedStage.title || `Den ${focusedStage.order_index + 1}`
+            : trail?.name ?? 'Mapa'}
         </span>
       </header>
 
       <div className="relative flex-1">
         {mapRoutes.length === 0 ? (
           <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-            No route geometry to show yet.
+            Zatím není k dispozici geometrie trasy.
           </div>
         ) : (
           <MapView routes={mapRoutes} className="h-full w-full" />

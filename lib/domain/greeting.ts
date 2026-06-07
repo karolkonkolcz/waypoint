@@ -6,11 +6,11 @@
 export function getGreeting(date: Date, name: string): string {
   const h = date.getHours();
   const word =
-    h < 5 ? 'Good night'
-    : h < 12 ? 'Good morning'
-    : h < 17 ? 'Good afternoon'
-    : h < 21 ? 'Good evening'
-    : 'Good night';
+    h < 5 ? 'Dobrou noc'
+    : h < 12 ? 'Dobré ráno'
+    : h < 17 ? 'Dobré odpoledne'
+    : h < 21 ? 'Dobrý večer'
+    : 'Dobrou noc';
 
   const trimmed = name.trim();
   return trimmed ? `${word}, ${trimmed}` : word;

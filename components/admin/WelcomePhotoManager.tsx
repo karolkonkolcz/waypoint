@@ -15,8 +15,8 @@ export function WelcomePhotoManager() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const [altText, setAltText] = useState('Hiker on a mountain trail');
-  const [locationLabel, setLocationLabel] = useState('High Tatras');
+  const [altText, setAltText] = useState('Turista na horské stezce');
+  const [locationLabel, setLocationLabel] = useState('Vysoké Tatry');
   const [sortOrder, setSortOrder] = useState('0');
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -48,13 +48,13 @@ export function WelcomePhotoManager() {
     setStatus(null);
     const file = fileRef.current?.files?.[0];
     if (!file) {
-      setError('Choose a photo first.');
+      setError('Nejdřív vyber fotku.');
       return;
     }
 
     const trimmedAlt = altText.trim();
     if (!trimmedAlt) {
-      setError('Alt text is required.');
+      setError('Alternativní text je povinný.');
       return;
     }
 
@@ -65,7 +65,7 @@ export function WelcomePhotoManager() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not signed in.');
+      if (!user) throw new Error('Nejsi přihlášený/á.');
 
       const upload = await uploadWelcomePhoto(file);
       uploadedPath = upload.storagePath;
@@ -83,13 +83,13 @@ export function WelcomePhotoManager() {
       if (insertError) throw insertError;
 
       if (fileRef.current) fileRef.current.value = '';
-      setStatus('Photo uploaded.');
+      setStatus('Fotka byla nahrána.');
       await loadPhotos();
     } catch (err) {
       if (uploadedPath) {
         await removeWelcomePhoto(uploadedPath).catch(() => undefined);
       }
-      setError(err instanceof Error ? err.message : 'Upload failed.');
+      setError(err instanceof Error ? err.message : 'Nahrání selhalo.');
     } finally {
       setPending(false);
     }
@@ -111,13 +111,13 @@ export function WelcomePhotoManager() {
     setPhotos((current) =>
       current.map((photo) => (photo.id === id ? { ...photo, ...patch } : photo)),
     );
-    setStatus('Saved.');
+    setStatus('Uloženo.');
   }
 
   async function deletePhoto(photo: WelcomePhotoRow) {
     setError(null);
     setStatus(null);
-    const confirmed = window.confirm('Remove this welcome photo?');
+    const confirmed = window.confirm('Odebrat tuto uvítací fotku?');
     if (!confirmed) return;
 
     const { error: updateError } = await createClient()
@@ -132,22 +132,22 @@ export function WelcomePhotoManager() {
 
     await removeWelcomePhoto(photo.storage_path).catch(() => undefined);
     setPhotos((current) => current.filter((item) => item.id !== photo.id));
-    setStatus('Photo removed.');
+    setStatus('Fotka byla odebrána.');
   }
 
   return (
     <div className="space-y-6">
       <form onSubmit={handleUpload} className="space-y-4 rounded-2xl border bg-card p-4 shadow-sm">
         <div>
-          <h2 className="text-lg font-bold">Upload hero photo</h2>
+          <h2 className="text-lg font-bold">Nahrát úvodní fotku</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Photos are resized in the browser and stored in the Supabase welcome-photos bucket.
+            Fotky se zmenší v prohlížeči a uloží do Supabase bucketu welcome-photos.
           </p>
         </div>
 
         <div className="space-y-1.5">
           <label htmlFor="welcome-photo" className="text-xs font-medium text-muted-foreground">
-            Photo
+            Fotka
           </label>
           <input
             ref={fileRef}
@@ -161,7 +161,7 @@ export function WelcomePhotoManager() {
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2">
             <label htmlFor="alt_text" className="text-xs font-medium text-muted-foreground">
-              Alt text
+              Alternativní text
             </label>
             <input
               id="alt_text"
@@ -173,19 +173,19 @@ export function WelcomePhotoManager() {
           </div>
           <div className="space-y-1.5">
             <label htmlFor="location_label" className="text-xs font-medium text-muted-foreground">
-              Location label
+              Popisek místa
             </label>
             <input
               id="location_label"
               value={locationLabel}
               onChange={(event) => setLocationLabel(event.target.value)}
               className="input"
-              placeholder="High Tatras"
+              placeholder="Vysoké Tatry"
             />
           </div>
           <div className="space-y-1.5">
             <label htmlFor="sort_order" className="text-xs font-medium text-muted-foreground">
-              Sort order
+              Pořadí
             </label>
             <input
               id="sort_order"
@@ -207,15 +207,15 @@ export function WelcomePhotoManager() {
           className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
         >
           {pending ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <ImagePlusIcon className="h-4 w-4" />}
-          {pending ? 'Uploading…' : 'Upload photo'}
+          {pending ? 'Nahrávám…' : 'Nahrát fotku'}
         </button>
       </form>
 
       <section className="space-y-3">
         <div>
-          <h2 className="text-lg font-bold">Current photos</h2>
+          <h2 className="text-lg font-bold">Aktuální fotky</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            The public welcome screen uses the first active photo by sort order.
+            Veřejná uvítací obrazovka používá první aktivní fotku podle pořadí.
           </p>
         </div>
 
@@ -226,7 +226,7 @@ export function WelcomePhotoManager() {
           </div>
         ) : photos.length === 0 ? (
           <p className="rounded-2xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-            No welcome photos yet.
+            Zatím žádné uvítací fotky.
           </p>
         ) : (
           <ul className="space-y-3">
@@ -237,11 +237,11 @@ export function WelcomePhotoManager() {
                 <div className="space-y-3 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate font-semibold">{photo.location_label ?? 'No location label'}</p>
+                      <p className="truncate font-semibold">{photo.location_label ?? 'Bez popisku místa'}</p>
                       <p className="mt-1 text-sm text-muted-foreground">{photo.alt_text}</p>
                     </div>
                     <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold">
-                      {photo.is_active ? 'Active' : 'Inactive'}
+                      {photo.is_active ? 'Aktivní' : 'Neaktivní'}
                     </span>
                   </div>
 
@@ -252,11 +252,11 @@ export function WelcomePhotoManager() {
                         checked={photo.is_active}
                         onChange={(event) => updatePhoto(photo.id, { is_active: event.target.checked })}
                       />
-                      Show on welcome
+                      Zobrazit na uvítací obrazovce
                     </label>
                     <input
                       type="number"
-                      aria-label="Sort order"
+                      aria-label="Pořadí"
                       defaultValue={photo.sort_order}
                       onBlur={(event) =>
                         updatePhoto(photo.id, {
@@ -273,7 +273,7 @@ export function WelcomePhotoManager() {
                     className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-destructive/30 px-4 py-2 text-sm font-semibold text-destructive hover:bg-destructive/5"
                   >
                     <Trash2Icon className="h-4 w-4" />
-                    Remove photo
+                    Odebrat fotku
                   </button>
                 </div>
               </li>

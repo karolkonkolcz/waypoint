@@ -96,7 +96,7 @@ describe('parseGPX', () => {
       <trkpt lat="47.0" lon="8.0"><ele>500</ele></trkpt>
     </trkseg></trk></gpx>`;
     expect(() => parseGPX(singlePoint)).toThrow(GPXParseError);
-    expect(() => parseGPX(singlePoint)).toThrow('at least 2');
+    expect(() => parseGPX(singlePoint)).toThrow('alespoň 2');
   });
 
   it('downsamples elevation profile to ≤ 500 points when track is large', () => {

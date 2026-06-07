@@ -23,7 +23,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "Waypoint",
-  description: "Your offline-first hiking itinerary companion",
+  description: "Turistický itinerář dostupný bez připojení",
   manifest: "/manifest.json",
   icons: {
     icon: [
@@ -47,7 +47,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="cs"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">

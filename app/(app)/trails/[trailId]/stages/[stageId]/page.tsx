@@ -144,9 +144,9 @@ export default function StagePage() {
   if (!stage || !trail) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4">
-        <p className="text-muted-foreground">Stage not found.</p>
+        <p className="text-muted-foreground">Etapa nebyla nalezena.</p>
         <Link href={`/trails/${trailId}`} className="text-sm text-primary hover:underline">
-          Back to trail
+          Zpět na trasu
         </Link>
       </div>
     );
@@ -168,9 +168,9 @@ export default function StagePage() {
   const stageCalendarDate = stageDate(stage, trail.start_date);
 
   const stats = [
-    { label: 'Distance', value: `${stage.distance_km} km`, icon: '↔' },
-    { label: 'Ascent', value: `${stage.ascent_m} m`, icon: '↑' },
-    { label: 'Descent', value: `${stage.descent_m} m`, icon: '↓' },
+    { label: 'Vzdálenost', value: `${stage.distance_km} km`, icon: '↔' },
+    { label: 'Stoupání', value: `${stage.ascent_m} m`, icon: '↑' },
+    { label: 'Klesání', value: `${stage.descent_m} m`, icon: '↓' },
   ];
 
   return (
@@ -202,13 +202,13 @@ export default function StagePage() {
       {isTransit && (
         <section className="mb-6">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Timeline
+            Časová osa
           </h2>
           <StageTimeline milestones={stage.timeline} />
           {stage.location_name && (
             <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
               <MapPinIcon className="h-3.5 w-3.5" />
-              Weather for {stage.location_name}
+              Počasí pro {stage.location_name}
             </p>
           )}
         </section>
@@ -221,11 +221,11 @@ export default function StagePage() {
           <div className="mb-6 flex items-center gap-3 rounded-2xl bg-primary px-5 py-4 text-primary-foreground">
             <ClockIcon className="h-6 w-6 shrink-0 opacity-80" />
             <div>
-              <p className="text-xs font-medium opacity-70">Estimated hiking time</p>
+              <p className="text-xs font-medium opacity-70">Odhad času chůze</p>
               <p className="text-2xl font-bold tabular-nums">{formatHours(totalHours)}</p>
               {trail.start_date && (
                 <p className="text-xs opacity-70">
-                  at {paceKmh} km/h pace
+                  při tempu {paceKmh} km/h
                 </p>
               )}
             </div>
@@ -238,7 +238,7 @@ export default function StagePage() {
           {stageProfile && (
             <section className="mb-6 rounded-2xl border bg-card px-4 pt-3 pb-2">
               <h2 className="mb-1 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                Elevation
+                Výškový profil
               </h2>
               <ElevationChart profile={stageProfile} />
             </section>
@@ -249,13 +249,13 @@ export default function StagePage() {
             <section className="mb-6 overflow-hidden rounded-2xl border bg-card">
               <div className="flex items-center justify-between px-4 pt-3 pb-2">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Map
+                  Mapa
                 </h2>
                 <Link
                   href={`/trails/${trailId}/map?stage=${stageId}`}
                   className="text-xs text-primary hover:underline"
                 >
-                  Open map
+                  Otevřít mapu
                 </Link>
               </div>
               <MapView routes={stageMapRoutes} className="h-56 w-full" />
@@ -290,7 +290,7 @@ export default function StagePage() {
       {stage.difficulty_class && (
         <section className="mb-6 rounded-2xl border bg-card p-4">
           <h2 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            Difficulty
+            Obtížnost
           </h2>
           <div className="flex items-center justify-between">
             <DifficultyBadge
@@ -306,7 +306,7 @@ export default function StagePage() {
       {stage.notes && (
         <section className="mb-6 rounded-2xl border bg-card p-4">
           <h2 className="mb-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            Notes
+            Poznámky
           </h2>
           <p className="text-sm leading-relaxed whitespace-pre-wrap">{stage.notes}</p>
         </section>
@@ -324,7 +324,7 @@ export default function StagePage() {
           onClick={() => setEditing(true)}
           className="mb-6 w-full rounded-2xl border py-3 text-sm font-medium hover:bg-muted"
         >
-          Edit {isTransit ? 'day' : 'stage'}
+          Upravit {isTransit ? 'den' : 'etapu'}
         </button>
       )}
 
@@ -358,20 +358,20 @@ export default function StagePage() {
           className="flex w-full items-center justify-center gap-2 rounded-full border border-destructive/30 py-2.5 text-sm font-medium text-destructive hover:bg-destructive/5"
         >
           <Trash2Icon className="h-4 w-4" />
-          Delete stage
+          Smazat etapu
         </button>
       </div>
 
       <AlertDialog
         open={deleteOpen}
-        title="Delete stage?"
+        title="Smazat etapu?"
         description={
           isTransit
-            ? `"${stage.title}" and its timeline will be permanently deleted.`
-            : `"${stage.title}" and its route will be permanently deleted.`
+            ? `"${stage.title}" a její časová osa budou trvale smazány.`
+            : `"${stage.title}" a její trasa budou trvale smazány.`
         }
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
+        confirmLabel="Smazat"
+        cancelLabel="Zrušit"
         destructive
         onConfirm={async () => {
           await stageRepo.remove(stageId);
@@ -424,31 +424,31 @@ function EditStageForm({
 
   return (
     <form onSubmit={handleSubmit} className="mb-6 space-y-4 rounded-2xl border bg-card p-4">
-      <h2 className="font-semibold">Edit Stage</h2>
+      <h2 className="font-semibold">Upravit etapu</h2>
 
       <input
         name="title"
         defaultValue={stage.title}
         required
-        placeholder="Stage title"
+        placeholder="Název etapy"
         className="input"
       />
       <div className="space-y-1">
-        <label className="text-xs text-muted-foreground">Date</label>
+        <label className="text-xs text-muted-foreground">Datum</label>
         <input name="date" type="date" defaultValue={stage.date ?? ''} className="input" />
-        <p className="text-xs text-muted-foreground">Leave empty to follow the trail start date.</p>
+        <p className="text-xs text-muted-foreground">Nech prázdné, pokud se má datum řídit startem trasy.</p>
       </div>
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">Distance (km)</label>
+          <label className="text-xs text-muted-foreground">Vzdálenost (km)</label>
           <input name="distance_km" type="number" step="0.1" defaultValue={stage.distance_km} className="input" />
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">Ascent (m)</label>
+          <label className="text-xs text-muted-foreground">Stoupání (m)</label>
           <input name="ascent_m" type="number" defaultValue={stage.ascent_m} className="input" />
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">Descent (m)</label>
+          <label className="text-xs text-muted-foreground">Klesání (m)</label>
           <input name="descent_m" type="number" defaultValue={stage.descent_m} className="input" />
         </div>
       </div>
@@ -456,19 +456,19 @@ function EditStageForm({
         name="notes"
         rows={3}
         defaultValue={stage.notes ?? ''}
-        placeholder="Notes…"
+        placeholder="Poznámky…"
         className="input resize-none"
       />
       <div className="flex gap-2">
         <button type="button" onClick={onDone} className="flex-1 rounded-full border py-2.5 text-sm font-medium hover:bg-muted">
-          Cancel
+          Zrušit
         </button>
         <button
           type="submit"
           disabled={pending}
           className="flex-1 rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
         >
-          {pending ? 'Saving…' : 'Save'}
+          {pending ? 'Ukládám…' : 'Uložit'}
         </button>
       </div>
     </form>

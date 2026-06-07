@@ -10,7 +10,7 @@ export async function ensureSignedInProfile(): Promise<SaveProfileResult> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: 'Not signed in' };
+  if (!user) return { error: 'Nejsi přihlášený/á' };
 
   const { error } = await supabase
     .from('profiles')
@@ -35,7 +35,7 @@ export async function saveDisplayName(name: string): Promise<SaveProfileResult> 
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: 'Not signed in' };
+  if (!user) return { error: 'Nejsi přihlášený/á' };
 
   const { error } = await supabase
     .from('profiles')

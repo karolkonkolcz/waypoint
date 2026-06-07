@@ -1,7 +1,7 @@
 {
   "name": "Waypoint",
   "short_name": "Waypoint",
-  "description": "Your offline-first hiking itinerary companion",
+  "description": "Turistický itinerář dostupný bez připojení",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
@@ -14,5 +14,5 @@
     { "src": "/favicons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "categories": ["navigation", "sports"],
-  "lang": "en"
+  "lang": "cs"
 }

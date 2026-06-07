@@ -25,8 +25,8 @@ export default async function WelcomePhotosAdminPage() {
           <ArrowLeftIcon className="h-5 w-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">Welcome photos</h1>
-          <p className="text-sm text-muted-foreground">Manage the public /welcome hero.</p>
+          <h1 className="text-2xl font-bold">Fotky uvítací obrazovky</h1>
+          <p className="text-sm text-muted-foreground">Správa veřejného úvodního obrázku na /welcome.</p>
         </div>
       </div>
 

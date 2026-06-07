@@ -53,7 +53,7 @@ describe('parseMeteoalarmFeed', () => {
     );
     expect(out).toHaveLength(1);
     expect(out[0].severity).toBe('yellow');
-    expect(out[0].event).toBe('Thunderstorm');
+    expect(out[0].event).toBe('Bouřky');
     expect(out[0].areas).toEqual(['Pezinok']);
   });
 

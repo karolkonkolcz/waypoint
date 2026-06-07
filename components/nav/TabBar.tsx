@@ -26,25 +26,25 @@ type Tab = {
 const TABS: Tab[] = [
   {
     href: '/',
-    label: 'Trails',
+    label: 'Trasy',
     Icon: ListIcon,
     isActive: (p) => p === '/' || p.startsWith('/trails'),
   },
   {
     href: '/today',
-    label: 'Today',
+    label: 'Dnes',
     Icon: SunriseIcon,
     isActive: (p) => p.startsWith('/today'),
   },
   {
     href: '/weather',
-    label: 'Weather',
+    label: 'Počasí',
     Icon: CloudSunIcon,
     isActive: (p) => p.startsWith('/weather'),
   },
   {
     href: '/settings',
-    label: 'Settings',
+    label: 'Nastavení',
     Icon: SettingsIcon,
     isActive: (p) => p.startsWith('/settings') || p.startsWith('/account'),
   },

@@ -8,10 +8,10 @@ interface Props {
 }
 
 const LABELS: Record<DifficultyClass, string> = {
-  easy: 'Easy',
-  moderate: 'Moderate',
-  hard: 'Hard',
-  extreme: 'Extreme',
+  easy: 'Snadná',
+  moderate: 'Střední',
+  hard: 'Těžká',
+  extreme: 'Extrémní',
 };
 
 const STYLES: Record<DifficultyClass, string> = {

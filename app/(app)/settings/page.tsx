@@ -36,7 +36,7 @@ export default function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-lg px-4 pt-6">
-      <h1 className="mb-6 text-2xl font-bold">Settings</h1>
+      <h1 className="mb-6 text-2xl font-bold">Nastavení</h1>
 
       <section className="space-y-2">
         <Link
@@ -44,7 +44,7 @@ export default function SettingsPage() {
           className="flex w-full items-center gap-3 rounded-2xl border bg-card px-4 py-3 text-sm font-medium hover:bg-muted"
         >
           <UserIcon className="h-4 w-4" />
-          Account
+          Účet
           <ChevronRightIcon className="ml-auto h-4 w-4 text-muted-foreground" />
         </Link>
 
@@ -54,7 +54,7 @@ export default function SettingsPage() {
             className="flex w-full items-center gap-3 rounded-2xl border bg-card px-4 py-3 text-sm font-medium hover:bg-muted"
           >
             <ShieldIcon className="h-4 w-4" />
-            Welcome photos
+            Fotky uvítací obrazovky
             <ChevronRightIcon className="ml-auto h-4 w-4 text-muted-foreground" />
           </Link>
         )}
@@ -64,7 +64,7 @@ export default function SettingsPage() {
           className="flex w-full items-center gap-3 rounded-2xl border bg-card px-4 py-3 text-sm font-medium text-destructive hover:bg-destructive/5"
         >
           <LogOutIcon className="h-4 w-4" />
-          Sign out
+          Odhlásit se
         </button>
       </section>
     </div>

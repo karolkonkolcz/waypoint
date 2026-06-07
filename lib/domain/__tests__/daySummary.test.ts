@@ -21,31 +21,31 @@ const trek = {
 describe('buildDaySummary', () => {
   it('leads a trek day with difficulty, distance and climb', () => {
     expect(buildDaySummary({ stage: trek })).toBe(
-      'A moderate 14 km day with 450 m of climbing.',
+      'Dnes tě čeká středně náročný den: 14 km s 450 m stoupání.',
     );
   });
 
   it('says dry all day when no precipitation', () => {
     const s = snapshot([entry(8, 0), entry(12, 0), entry(16, 0)], 0);
     expect(buildDaySummary({ stage: trek, snapshot: s })).toBe(
-      'A moderate 14 km day with 450 m of climbing — dry all day.',
+      'Dnes tě čeká středně náročný den: 14 km s 450 m stoupání — po celý den sucho.',
     );
   });
 
   it('detects front-loaded rain clearing', () => {
     const s = snapshot([entry(8, 1.2), entry(12, 0.3), entry(16, 0)], 1.5);
-    expect(buildDaySummary({ stage: trek, snapshot: s })).toContain('rain clearing through the day');
+    expect(buildDaySummary({ stage: trek, snapshot: s })).toContain('déšť během dne ustoupí');
   });
 
   it('detects rain moving in later', () => {
     const s = snapshot([entry(8, 0), entry(12, 0), entry(16, 2)], 2);
-    expect(buildDaySummary({ stage: trek, snapshot: s })).toContain('rain moving in later');
+    expect(buildDaySummary({ stage: trek, snapshot: s })).toContain('déšť přijde později');
   });
 
   it('phrases climb bands', () => {
-    expect(buildDaySummary({ stage: { ...trek, ascent_m: 100 } })).toContain('little climbing');
-    expect(buildDaySummary({ stage: { ...trek, ascent_m: 800 } })).toContain('a solid 800 m climb');
-    expect(buildDaySummary({ stage: { ...trek, ascent_m: 1500 } })).toContain('a big 1500 m climb');
+    expect(buildDaySummary({ stage: { ...trek, ascent_m: 100 } })).toContain('malým stoupáním');
+    expect(buildDaySummary({ stage: { ...trek, ascent_m: 800 } })).toContain('poctivým stoupáním 800 m');
+    expect(buildDaySummary({ stage: { ...trek, ascent_m: 1500 } })).toContain('velkým stoupáním 1500 m');
   });
 
   it('uses route-aware rain timing when the snapshot is moving', () => {
@@ -58,7 +58,7 @@ describe('buildDaySummary', () => {
       rainStartsHour: 13,
       rainStartsKm: 9,
     };
-    expect(buildDaySummary({ stage: trek, snapshot: s })).toContain('rain reaches you around 13:00');
+    expect(buildDaySummary({ stage: trek, snapshot: s })).toContain('déšť tě zastihne kolem 13:00');
   });
 
   it('says dry all day for a moving snapshot with no rain', () => {
@@ -68,12 +68,12 @@ describe('buildDaySummary', () => {
       rainStartsHour: null,
       rainStartsKm: null,
     };
-    expect(buildDaySummary({ stage: trek, snapshot: s })).toContain('dry all day');
+    expect(buildDaySummary({ stage: trek, snapshot: s })).toContain('po celý den sucho');
   });
 
   it('frames a transit day as travel', () => {
     expect(
       buildDaySummary({ stage: { stage_type: 'transit', title: 'Chamonix', distance_km: 0, ascent_m: 0, difficulty_class: null } }),
-    ).toBe('A travel day to Chamonix.');
+    ).toBe('Přesunový den do Chamonix.');
   });
 });

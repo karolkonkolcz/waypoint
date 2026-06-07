@@ -8,16 +8,16 @@ interface Props {
   fetchedAt: string; // ISO
 }
 
-/** Compact relative-time, e.g. "3 h ago" / "just now". */
+/** Compact relative-time, e.g. "před 3 h" / "právě teď". */
 function relativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const mins = Math.round(diffMs / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins} min ago`;
+  if (mins < 1) return 'právě teď';
+  if (mins < 60) return `před ${mins} min`;
   const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours} h ago`;
+  if (hours < 24) return `před ${hours} h`;
   const days = Math.round(hours / 24);
-  return `${days} d ago`;
+  return `před ${days} d`;
 }
 
 /**
@@ -30,8 +30,8 @@ export default function OfflineBanner({ trailName, stageTitle, fetchedAt }: Prop
     <div className="flex items-start gap-2 rounded-2xl border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
       <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0" />
       <p className="leading-snug">
-        Estimated position on <span className="font-semibold">{trailName}</span> · {stageTitle} ·
-        forecast from {relativeTime(fetchedAt)}
+        Odhadovaná poloha na trase <span className="font-semibold">{trailName}</span> · {stageTitle} ·
+        předpověď aktualizována {relativeTime(fetchedAt)}
       </p>
     </div>
   );

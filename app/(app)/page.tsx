@@ -138,18 +138,18 @@ export default function HomePage() {
 
           <SectionHeader
             className="mb-3"
-            title="My Trails"
+            title="Moje trasy"
             subtitle={
               <>
-                {trails.length} {trails.length === 1 ? 'itinerary' : 'itineraries'}
-                {offlineCount ? ` · ${offlineCount} offline` : ''}
+                {trails.length} {trails.length === 1 ? 'itinerář' : trails.length >= 2 && trails.length <= 4 ? 'itineráře' : 'itinerářů'}
+                {offlineCount ? ` · ${offlineCount} bez připojení` : ''}
               </>
             }
             action={
               <Link
                 href="/trails/new"
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:scale-95"
-                aria-label="Create new trail"
+                aria-label="Vytvořit novou trasu"
               >
                 <PlusIcon className="h-5 w-5" />
               </Link>
@@ -166,7 +166,7 @@ export default function HomePage() {
             </ul>
           ) : (
             <p className="rounded-2xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-              This is your only trek so far. Tap + to add another.
+              Zatím máš jen jeden trek. Klepnutím na + přidáš další.
             </p>
           )}
         </>
@@ -210,7 +210,7 @@ function TrailCard({ trail, stages }: { trail: TrailRow; stages: number }) {
           )}
           <span className="text-xs text-muted-foreground">
             <span className="font-mono font-semibold tabular-nums">{stages}</span>{' '}
-            {stages === 1 ? 'stage' : 'stages'}
+            {stages === 1 ? 'etapa' : stages >= 2 && stages <= 4 ? 'etapy' : 'etap'}
           </span>
         </div>
       </div>
@@ -226,9 +226,9 @@ function EmptyState() {
         <MountainIcon className="h-8 w-8 text-muted-foreground" />
       </div>
       <div>
-        <p className="font-semibold">No trails yet</p>
+        <p className="font-semibold">Zatím žádné trasy</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Create your first trail to start planning your hike.
+          Vytvoř si první trasu a začni plánovat cestu.
         </p>
       </div>
       <Link
@@ -238,7 +238,7 @@ function EmptyState() {
           'bg-primary text-primary-foreground hover:bg-primary/90',
         )}
       >
-        Create trail
+        Vytvořit trasu
       </Link>
     </div>
   );

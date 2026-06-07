@@ -30,7 +30,7 @@ describe('deriveTrailName', () => {
   it('strips export- prefix and extension, title-cases', () => {
     expect(deriveTrailName('export-Korzika.gpx')).toBe('Korzika');
     expect(deriveTrailName('gr20_corsica.GPX')).toBe('Gr20 Corsica');
-    expect(deriveTrailName('export-.gpx')).toBe('Imported trek');
+    expect(deriveTrailName('export-.gpx')).toBe('Importovaný trek');
   });
 });
 
@@ -80,11 +80,11 @@ describe('importTrek', () => {
     expect(await routeRepo.findByTrail(trailId)).toBeUndefined();
   });
 
-  it('falls back to Day N titles when tracks are unnamed', async () => {
+  it('falls back to Den N titles when tracks are unnamed', async () => {
     const noNames = TREK.replace(/Deň \d/g, '');
     const tracks = parseGPXTracks(noNames);
     const { trailId } = await importTrek(tracks, { userId: USER, trailName: 'X' });
     const stages = await stageRepo.findByTrail(trailId);
-    expect(stages.map((s) => s.title)).toEqual(['Day 1', 'Day 2', 'Day 3']);
+    expect(stages.map((s) => s.title)).toEqual(['Den 1', 'Den 2', 'Den 3']);
   });
 });

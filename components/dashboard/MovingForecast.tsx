@@ -96,13 +96,13 @@ export function MovingForecast({ snapshot, loading }: Props) {
   return (
     <section className="rounded-2xl border bg-card p-3">
       <div className="mb-2 flex items-center justify-between">
-        <Eyebrow>Moving forecast</Eyebrow>
+        <Eyebrow>Předpověď po trase</Eyebrow>
         <div className="flex items-center gap-1.5">
           {loading && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />}
           {snapshot.moving && (
             <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
               <RouteIcon className="h-3 w-3" />
-              route-aware
+              podle trasy
             </span>
           )}
         </div>
@@ -151,7 +151,7 @@ export function MovingForecast({ snapshot, loading }: Props) {
                     ) : (
                       <FlagIcon className="h-2.5 w-2.5" />
                     )}
-                    {slot.phase === 'start' ? 'start' : 'dest'}
+                    {slot.phase === 'start' ? 'start' : 'cíl'}
                   </span>
                 )}
               </div>
@@ -166,7 +166,7 @@ export function MovingForecast({ snapshot, loading }: Props) {
             style={{ left: `${markerPct}%` }}
           >
             <span className="rounded bg-primary px-1 py-px text-[8px] font-bold uppercase leading-none tracking-wide text-primary-foreground">
-              You
+              Ty
             </span>
             <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary" />
             <span className="w-px flex-1 bg-primary/70" />
@@ -179,8 +179,8 @@ export function MovingForecast({ snapshot, loading }: Props) {
         <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
           <CloudRainIcon className="h-3.5 w-3.5" />
           {rainHour != null
-            ? `Rain reaches you around ${String(rainHour % 24).padStart(2, '0')}:00${rainKm != null ? ` · km ${rainKm}` : ''}`
-            : 'Dry the whole way'}
+            ? `Déšť tě zastihne kolem ${String(rainHour % 24).padStart(2, '0')}:00${rainKm != null ? ` · km ${rainKm}` : ''}`
+            : 'Po celé trase sucho'}
         </p>
       )}
     </section>

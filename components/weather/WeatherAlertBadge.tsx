@@ -36,17 +36,17 @@ export function WeatherAlertBadge({ alerts, stale }: Props) {
             {alert.areas.length > 0 && (
               <p className="text-xs opacity-80">
                 {alert.areas.slice(0, 3).join(', ')}
-                {alert.areas.length > 3 ? ` +${alert.areas.length - 3} more` : ''}
+                {alert.areas.length > 3 ? ` +${alert.areas.length - 3} další` : ''}
               </p>
             )}
             {alert.expires && (
-              <p className="text-xs opacity-70">until {formatWhen(alert.expires)}</p>
+              <p className="text-xs opacity-70">do {formatWhen(alert.expires)}</p>
             )}
           </div>
         </div>
       ))}
       {stale && (
-        <p className="text-xs text-muted-foreground">Warnings may be out of date (offline).</p>
+        <p className="text-xs text-muted-foreground">Výstrahy mohou být zastaralé (bez připojení).</p>
       )}
     </div>
   );
@@ -55,7 +55,7 @@ export function WeatherAlertBadge({ alerts, stale }: Props) {
 function formatWhen(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString('en-GB', {
+  return d.toLocaleString('cs-CZ', {
     weekday: 'short',
     hour: '2-digit',
     minute: '2-digit',

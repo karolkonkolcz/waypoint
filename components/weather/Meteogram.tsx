@@ -46,7 +46,7 @@ function timeAxis(showLabels: boolean): uPlot.Axis {
             const d = new Date(s * 1000);
             const h = d.getHours();
             if (h === 0)
-              return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' });
+              return d.toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric' });
             return `${String(h).padStart(2, '0')}:00`;
           })
       : () => [],
@@ -86,7 +86,7 @@ function buildPanels(data: MeteogramData): PanelBuilder[] {
   if (data.temperature) {
     panels.push({
       key: 'temp',
-      title: 'Temperature (°C)',
+      title: 'Teplota (°C)',
       build: (root, width, sync, showX) => {
         const hasBand = !!(data.tempMin && data.tempMax);
         const series: uPlot.Series[] = [{}];
@@ -98,7 +98,7 @@ function buildPanels(data: MeteogramData): PanelBuilder[] {
           );
           seriesData.push(data.tempMax!, data.tempMin!);
         }
-        series.push({ scale: 't', label: 'temp', stroke: '#f37013', width: 2, points: { show: false } });
+        series.push({ scale: 't', label: 'teplota', stroke: '#f37013', width: 2, points: { show: false } });
         seriesData.push(data.temperature!);
         return new uPlot(
           {
@@ -118,7 +118,7 @@ function buildPanels(data: MeteogramData): PanelBuilder[] {
   if (data.cloudLow || data.cloudMid || data.cloudHigh) {
     panels.push({
       key: 'cloud',
-      title: 'Cloud cover (%)',
+      title: 'Oblačnost (%)',
       build: (root, width, sync, showX) =>
         new uPlot(
           {
@@ -127,9 +127,9 @@ function buildPanels(data: MeteogramData): PanelBuilder[] {
             axes: [timeAxis(showX), valueAxis('c')],
             series: [
               {},
-              { scale: 'c', label: 'high', stroke: '#90a4ae', fill: 'rgba(144,164,174,0.4)', points: { show: false } },
-              { scale: 'c', label: 'mid', stroke: '#607d8b', fill: 'rgba(96,125,139,0.4)', points: { show: false } },
-              { scale: 'c', label: 'low', stroke: '#37474f', fill: 'rgba(55,71,79,0.4)', points: { show: false } },
+              { scale: 'c', label: 'vysoká', stroke: '#90a4ae', fill: 'rgba(144,164,174,0.4)', points: { show: false } },
+              { scale: 'c', label: 'střední', stroke: '#607d8b', fill: 'rgba(96,125,139,0.4)', points: { show: false } },
+              { scale: 'c', label: 'nízká', stroke: '#37474f', fill: 'rgba(55,71,79,0.4)', points: { show: false } },
             ],
           } as uPlot.Options,
           [
@@ -147,7 +147,7 @@ function buildPanels(data: MeteogramData): PanelBuilder[] {
   if (data.rain || data.snow) {
     panels.push({
       key: 'precip',
-      title: 'Precipitation (mm)',
+      title: 'Srážky (mm)',
       build: (root, width, sync, showX) => {
         const bars = uPlot.paths.bars!({ size: [0.6, 24] });
         const rain = data.rain ?? x.map(() => 0);
@@ -161,8 +161,8 @@ function buildPanels(data: MeteogramData): PanelBuilder[] {
             axes: [timeAxis(showX), valueAxis('p')],
             series: [
               {},
-              { scale: 'p', label: 'snow', stroke: '#90caf9', fill: 'rgba(144,202,249,0.7)', paths: bars, points: { show: false } },
-              { scale: 'p', label: 'rain', stroke: '#1976d2', fill: 'rgba(25,118,210,0.8)', paths: bars, points: { show: false } },
+              { scale: 'p', label: 'sníh', stroke: '#90caf9', fill: 'rgba(144,202,249,0.7)', paths: bars, points: { show: false } },
+              { scale: 'p', label: 'déšť', stroke: '#1976d2', fill: 'rgba(25,118,210,0.8)', paths: bars, points: { show: false } },
             ],
           } as uPlot.Options,
           [x, total, rain] as uPlot.AlignedData,
@@ -176,7 +176,7 @@ function buildPanels(data: MeteogramData): PanelBuilder[] {
   if (data.pressure) {
     panels.push({
       key: 'pressure',
-      title: 'Pressure (hPa)',
+      title: 'Tlak (hPa)',
       build: (root, width, sync, showX) =>
         new uPlot(
           {
@@ -185,7 +185,7 @@ function buildPanels(data: MeteogramData): PanelBuilder[] {
             axes: [timeAxis(showX), valueAxis('hpa')],
             series: [
               {},
-              { scale: 'hpa', label: 'pressure', stroke: '#6a1b9a', width: 2, points: { show: false } },
+              { scale: 'hpa', label: 'tlak', stroke: '#6a1b9a', width: 2, points: { show: false } },
             ],
           } as uPlot.Options,
           [x, data.pressure!] as uPlot.AlignedData,
@@ -198,15 +198,15 @@ function buildPanels(data: MeteogramData): PanelBuilder[] {
   if (data.windSpeed) {
     panels.push({
       key: 'wind',
-      title: 'Wind (km/h)',
+      title: 'Vítr (km/h)',
       build: (root, width, sync, showX) => {
         const series: uPlot.Series[] = [
           {},
-          { scale: 'w', label: 'wind', stroke: '#00838f', width: 2, points: { show: false } },
+          { scale: 'w', label: 'vítr', stroke: '#00838f', width: 2, points: { show: false } },
         ];
         const seriesData: (number | null)[][] = [x, data.windSpeed!];
         if (data.windGusts) {
-          series.push({ scale: 'w', label: 'gusts', stroke: '#00838f', width: 1, dash: [4, 4], points: { show: false } });
+          series.push({ scale: 'w', label: 'nárazy', stroke: '#00838f', width: 1, dash: [4, 4], points: { show: false } });
           seriesData.push(data.windGusts);
         }
         return new uPlot(
@@ -227,7 +227,7 @@ function buildPanels(data: MeteogramData): PanelBuilder[] {
   if (data.windDir) {
     panels.push({
       key: 'winddir',
-      title: 'Wind direction (°)',
+      title: 'Směr větru (°)',
       build: (root, width, sync, showX) =>
         new uPlot(
           {
@@ -239,7 +239,7 @@ function buildPanels(data: MeteogramData): PanelBuilder[] {
             ],
             series: [
               {},
-              { scale: 'd', label: 'dir', stroke: '#f37013', paths: () => null, points: { show: true, size: 4 } },
+              { scale: 'd', label: 'směr', stroke: '#f37013', paths: () => null, points: { show: true, size: 4 } },
             ],
           } as uPlot.Options,
           [x, data.windDir!] as uPlot.AlignedData,
@@ -297,8 +297,7 @@ export default function Meteogram({ data }: Props) {
     <div className="rounded-2xl border bg-card p-3">
       {data.limited && (
         <p className="mb-2 rounded-lg bg-muted px-2 py-1 text-[11px] text-muted-foreground">
-          Limited offline data — showing temperature, precipitation and wind from your cached
-          forecast.
+          Omezená data bez připojení — z uložené předpovědi zobrazujeme teplotu, srážky a vítr.
         </p>
       )}
       <div ref={containerRef} />

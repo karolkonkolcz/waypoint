@@ -9,9 +9,9 @@ import { getLocalUserId } from '@/lib/auth/session';
 import { cn } from '@/lib/utils';
 
 const PACE_PRESETS = [
-  { label: 'Leisurely', kmh: 3, hint: 'Heavy pack or rough terrain' },
-  { label: 'Moderate', kmh: 4, hint: 'Typical hiking pace' },
-  { label: 'Fast', kmh: 5, hint: 'Light pack, experienced hiker' },
+  { label: 'Klidné', kmh: 3, hint: 'Těžký batoh nebo náročný terén' },
+  { label: 'Běžné', kmh: 4, hint: 'Typické turistické tempo' },
+  { label: 'Rychlé', kmh: 5, hint: 'Lehký batoh, zkušený turista' },
 ] as const;
 
 type PaceKmh = (typeof PACE_PRESETS)[number]['kmh'];
@@ -34,7 +34,7 @@ export default function NewTrailPage() {
 
     try {
       const userId = await getLocalUserId();
-      if (!userId) { setError('Not signed in'); return; }
+      if (!userId) { setError('Nejsi přihlášený/á'); return; }
 
       const trail = await trailRepo.create({
         user_id: userId,
@@ -47,7 +47,7 @@ export default function NewTrailPage() {
 
       router.push(`/trails/${trail.id}`);
     } catch {
-      setError('Could not create trail. Please try again.');
+      setError('Trasu se nepodařilo vytvořit. Zkus to prosím znovu.');
     } finally {
       setPending(false);
     }
@@ -63,29 +63,29 @@ export default function NewTrailPage() {
         >
           <ArrowLeftIcon className="h-5 w-5" />
         </Link>
-        <h1 className="text-xl font-bold">New Trail</h1>
+        <h1 className="text-xl font-bold">Nová trasa</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Name */}
-        <Field label="Trail name" required>
+        <Field label="Název trasy" required>
           <input
             name="name"
             type="text"
             required
             autoFocus
-            placeholder="e.g. Pacific Crest Trail"
+            placeholder="např. Pacific Crest Trail"
             maxLength={200}
             className="input"
           />
         </Field>
 
         {/* Description */}
-        <Field label="Description">
+        <Field label="Popis">
           <textarea
             name="description"
             rows={3}
-            placeholder="A short description of your hike…"
+            placeholder="Krátký popis tvé cesty…"
             maxLength={1000}
             className="input resize-none"
           />
@@ -93,15 +93,15 @@ export default function NewTrailPage() {
 
         {/* Start date */}
         <Field
-          label="Start date"
-          hint="Used for weather forecasts and per-stage ETA"
+          label="Datum startu"
+          hint="Použije se pro předpověď počasí a ETA jednotlivých etap"
         >
           <input name="start_date" type="date" className="input" />
         </Field>
 
         {/* Pace */}
         <div className="space-y-2">
-          <span className="text-sm font-medium">Default pace</span>
+          <span className="text-sm font-medium">Výchozí tempo</span>
           <div className="grid grid-cols-3 gap-2">
             {PACE_PRESETS.map((opt) => (
               <button
@@ -143,7 +143,7 @@ export default function NewTrailPage() {
           disabled={pending}
           className="w-full rounded-full bg-primary py-3.5 text-base font-semibold text-primary-foreground disabled:opacity-50"
         >
-          {pending ? 'Creating…' : 'Create Trail'}
+          {pending ? 'Vytvářím…' : 'Vytvořit trasu'}
         </button>
       </form>
     </div>

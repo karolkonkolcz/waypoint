@@ -52,10 +52,26 @@ function parseSeverity(value: string): AlertSeverity | null {
   }
 }
 
-/** awareness_type "3; Thunderstorm" → human label ("Thunderstorm"). */
+const EVENT_LABELS: Record<string, string> = {
+  '1': 'Vítr',
+  '2': 'Sníh a led',
+  '3': 'Bouřky',
+  '4': 'Mlha',
+  '5': 'Vysoké teploty',
+  '6': 'Nízké teploty',
+  '7': 'Pobřežní jevy',
+  '8': 'Riziko požárů',
+  '9': 'Laviny',
+  '10': 'Déšť',
+  '11': 'Povodně',
+  '12': 'Déšť a povodně',
+  '13': 'Mořské bouře',
+};
+
+/** awareness_type "3; Thunderstorm" → human label ("Bouřky"). */
 function parseEventType(value: string): string {
   const parts = value.split(';').map((s) => s.trim());
-  return parts[1] || parts[0] || 'Weather warning';
+  return EVENT_LABELS[parts[0]] ?? parts[1] ?? parts[0] ?? 'Výstraha počasí';
 }
 
 interface Param {
@@ -73,7 +89,15 @@ function paramValue(params: unknown, name: string): string | null {
 
 function pickInfo(info: unknown[]): Record<string, unknown> | null {
   if (info.length === 0) return null;
-  // Prefer the English variant for display; otherwise take the first.
+  // Prefer Czech/Slovak variants for display; otherwise fall back to English,
+  // then the first available language.
+  const preferred = info.find(
+    (i) =>
+      typeof (i as { language?: unknown }).language === 'string' &&
+      ['cs', 'sk'].some((lang) => ((i as { language: string }).language).toLowerCase().startsWith(lang)),
+  );
+  if (preferred) return preferred as Record<string, unknown>;
+
   const en = info.find(
     (i) =>
       typeof (i as { language?: unknown }).language === 'string' &&
@@ -122,7 +146,7 @@ export function parseMeteoalarmFeed(raw: unknown, now: number): WeatherAlert[] {
     if (expires && Date.parse(expires) < now) continue; // already over
 
     const typeRaw = paramValue(chosen.parameter, 'awareness_type');
-    const event = typeRaw ? parseEventType(typeRaw) : asString(chosen.event) || 'Weather warning';
+    const event = typeRaw ? parseEventType(typeRaw) : asString(chosen.event) || 'Výstraha počasí';
     const onset = asString(chosen.onset) || asString(chosen.effective) || null;
     const areas = areaDescs(chosen.area);
 

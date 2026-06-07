@@ -35,7 +35,7 @@ export default function AccountPage() {
           .maybeSingle();
         setName(data?.display_name ?? '');
       } catch {
-        setError('Could not load profile details.');
+        setError('Nepodařilo se načíst údaje profilu.');
         setStatus('error');
       } finally {
         setLoaded(true);
@@ -67,7 +67,7 @@ export default function AccountPage() {
         >
           <ArrowLeftIcon className="h-5 w-5" />
         </Link>
-        <h1 className="text-2xl font-bold">Account</h1>
+        <h1 className="text-2xl font-bold">Účet</h1>
       </div>
 
       {!loaded ? (
@@ -78,19 +78,19 @@ export default function AccountPage() {
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Email</label>
+            <label className="text-xs text-muted-foreground">E-mail</label>
             <input value={email ?? ''} readOnly disabled className="input opacity-70" />
           </div>
 
           <div className="space-y-1">
             <label htmlFor="display_name" className="text-xs text-muted-foreground">
-              Display name
+              Zobrazované jméno
             </label>
             <input
               id="display_name"
               name="display_name"
               autoComplete="name"
-              placeholder="Your name"
+              placeholder="Tvoje jméno"
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
@@ -101,7 +101,7 @@ export default function AccountPage() {
           </div>
 
           {status === 'saved' && (
-            <p className="text-sm text-green-600 dark:text-green-400">Saved.</p>
+            <p className="text-sm text-green-600 dark:text-green-400">Uloženo.</p>
           )}
           {status === 'error' && error && (
             <p className="text-sm text-destructive">{error}</p>
@@ -112,7 +112,7 @@ export default function AccountPage() {
             disabled={pending}
             className="w-full rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
-            {pending ? 'Saving…' : 'Save'}
+            {pending ? 'Ukládám…' : 'Uložit'}
           </button>
         </form>
       )}

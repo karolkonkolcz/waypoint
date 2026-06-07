@@ -129,7 +129,7 @@ export default function RadarMap({ lat, lon }: Props) {
   }, [frames, index]);
 
   const currentTime = frames[index]
-    ? new Date(frames[index].time * 1000).toLocaleTimeString(undefined, {
+        ? new Date(frames[index].time * 1000).toLocaleTimeString('cs-CZ', {
         hour: '2-digit',
         minute: '2-digit',
       })
@@ -142,7 +142,7 @@ export default function RadarMap({ lat, lon }: Props) {
 
         {/* Frame timestamp overlay (top-left). */}
         <div className="pointer-events-none absolute left-2 top-2 rounded-lg bg-card/85 px-2 py-1 text-xs font-medium backdrop-blur">
-          {failed ? 'Radar unavailable' : `Radar · ${currentTime}`}
+          {failed ? 'Radar není dostupný' : `Radar · ${currentTime}`}
         </div>
 
         {/* Play/pause + scrub controls (bottom bar). */}
@@ -151,7 +151,7 @@ export default function RadarMap({ lat, lon }: Props) {
             <button
               type="button"
               onClick={() => setPlaying((p) => !p)}
-              aria-label={playing ? 'Pause radar' : 'Play radar'}
+              aria-label={playing ? 'Pozastavit radar' : 'Spustit radar'}
               className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-muted active:scale-95"
             >
               {playing ? <PauseIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}
@@ -166,7 +166,7 @@ export default function RadarMap({ lat, lon }: Props) {
                 setIndex(Number(e.target.value));
               }}
               className="flex-1 accent-primary"
-              aria-label="Radar frame"
+              aria-label="Snímek radaru"
             />
           </div>
         )}

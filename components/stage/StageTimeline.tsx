@@ -14,13 +14,13 @@ type IconFC = React.FC<{ className?: string }>;
 // Display metadata per milestone kind — shared by the read-only timeline (F2)
 // and the timeline editor (F3) so labels/icons stay consistent.
 export const MILESTONE_META: Record<MilestoneKind, { label: string; icon: IconFC }> = {
-  bus: { label: 'Bus', icon: BusIcon },
-  train: { label: 'Train', icon: TrainFrontIcon },
-  flight: { label: 'Flight', icon: PlaneIcon },
-  transfer: { label: 'Transfer', icon: ArrowRightLeftIcon },
-  checkin: { label: 'Check-in', icon: BedIcon },
-  meal: { label: 'Meal', icon: UtensilsIcon },
-  note: { label: 'Note', icon: StickyNoteIcon },
+  bus: { label: 'Autobus', icon: BusIcon },
+  train: { label: 'Vlak', icon: TrainFrontIcon },
+  flight: { label: 'Let', icon: PlaneIcon },
+  transfer: { label: 'Přestup', icon: ArrowRightLeftIcon },
+  checkin: { label: 'Ubytování', icon: BedIcon },
+  meal: { label: 'Jídlo', icon: UtensilsIcon },
+  note: { label: 'Poznámka', icon: StickyNoteIcon },
 };
 
 export const MILESTONE_KINDS = Object.keys(MILESTONE_META) as MilestoneKind[];
@@ -39,7 +39,7 @@ export function StageTimeline({ milestones }: { milestones: Milestone[] }) {
   if (milestones.length === 0) {
     return (
       <div className="rounded-2xl border-2 border-dashed border-border px-6 py-8 text-center text-sm text-muted-foreground">
-        No milestones yet. Add bus, flight or transfer times for this day.
+        Zatím žádné milníky. Přidej časy autobusů, letů nebo přestupů pro tento den.
       </div>
     );
   }

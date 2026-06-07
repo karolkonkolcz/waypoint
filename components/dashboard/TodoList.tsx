@@ -59,7 +59,7 @@ export function TodoList({ trailId, userId, todos, stageId }: Props) {
         className="flex w-full items-center justify-between"
         aria-expanded={!collapsed}
       >
-        <Eyebrow>Today&apos;s checklist</Eyebrow>
+        <Eyebrow>Dnešní seznam</Eyebrow>
         <span className="flex items-center gap-2">
           {todos.length > 0 && (
             <span className="font-mono text-xs font-semibold tabular-nums text-muted-foreground">
@@ -83,7 +83,7 @@ export function TodoList({ trailId, userId, todos, stageId }: Props) {
                 <li key={todo.id} className="flex min-h-[44px] items-center gap-3 py-1.5">
                   <button
                     onClick={() => todoRepo.toggle(todo.id)}
-                    aria-label={todo.done ? 'Mark as not done' : 'Mark as done'}
+                    aria-label={todo.done ? 'Označit jako nesplněné' : 'Označit jako splněné'}
                     className={cn(
                       'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-colors',
                       todo.done
@@ -103,7 +103,7 @@ export function TodoList({ trailId, userId, todos, stageId }: Props) {
                   </span>
                   <button
                     onClick={() => todoRepo.remove(todo.id)}
-                    aria-label="Delete reminder"
+                    aria-label="Smazat připomínku"
                     className="shrink-0 p-1 text-muted-foreground hover:text-destructive"
                   >
                     <Trash2Icon className="h-4 w-4" />
@@ -122,7 +122,7 @@ export function TodoList({ trailId, userId, todos, stageId }: Props) {
                 onBlur={() => {
                   if (!text.trim()) setAdding(false);
                 }}
-                placeholder="Add a reminder…"
+                placeholder="Přidat připomínku…"
                 className="input"
               />
             </form>
@@ -132,7 +132,7 @@ export function TodoList({ trailId, userId, todos, stageId }: Props) {
               className="mt-2 flex min-h-[44px] items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
             >
               <PlusIcon className="h-4 w-4" />
-              add a reminder
+              přidat připomínku
             </button>
           )}
         </div>

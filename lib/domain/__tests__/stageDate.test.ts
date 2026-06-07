@@ -31,6 +31,6 @@ describe('stageDate', () => {
 
 describe('formatStageDate', () => {
   it('formats an ISO date without timezone drift', () => {
-    expect(formatStageDate('2026-06-01')).toBe('Mon 1 Jun');
+    expect(formatStageDate('2026-06-01')).toBe('po 1. 6.');
   });
 });

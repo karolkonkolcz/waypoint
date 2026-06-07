@@ -14,7 +14,7 @@ export const milestoneSchema = z.object({
   id: z.string().uuid(),
   time: z
     .string()
-    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'time must be HH:MM')
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'čas musí být ve formátu HH:MM')
     .nullable(),
   title: z.string().min(1).max(200),
   kind: z.enum(['bus', 'train', 'flight', 'transfer', 'checkin', 'meal', 'note']),

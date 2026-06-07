@@ -66,10 +66,10 @@ export async function uploadTrailCover(
   trailId: string,
 ): Promise<string> {
   if (!file.type.startsWith('image/')) {
-    throw new Error('Please choose an image file.');
+    throw new Error('Vyber prosím soubor obrázku.');
   }
   if (file.size > MAX_BYTES) {
-    throw new Error('Image is too large (max 10 MB).');
+    throw new Error('Obrázek je příliš velký (max. 10 MB).');
   }
 
   const { blob, ext, type } = await toWebp(file);
@@ -77,7 +77,7 @@ export async function uploadTrailCover(
   const supabase = createClient();
   const { data, error: authError } = await supabase.auth.getUser();
   if (authError || !data.user) {
-    throw new Error('Sign in before uploading a cover photo.');
+    throw new Error('Před nahráním úvodní fotky se přihlas.');
   }
 
   const path = `${data.user.id}/${trailId}-${Date.now()}.${ext}`;

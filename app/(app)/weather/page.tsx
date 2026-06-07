@@ -114,7 +114,7 @@ export default function WeatherPage() {
     <div className="mx-auto max-w-lg space-y-4 px-4 pt-4">
       <header className="space-y-0.5">
         <div className="flex items-baseline justify-between gap-2">
-          <h1 className="text-2xl font-bold">Weather</h1>
+          <h1 className="text-2xl font-bold">Počasí</h1>
           {mode.kind === 'online' && currentTemp(mode.forecast) !== null && (
             <span className="text-4xl font-bold tabular-nums leading-none text-foreground">
               {currentTemp(mode.forecast)}°

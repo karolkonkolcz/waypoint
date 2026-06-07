@@ -33,23 +33,29 @@ import type { TrailRow, Milestone, StageType } from '@/lib/db/dexie';
 
 /** One-line summary of a transit day's timeline for the stage list. */
 function transitSummary(timeline: Milestone[]): string {
-  if (timeline.length === 0) return 'Transit day · no milestones';
+  if (timeline.length === 0) return 'Přesunový den · bez milníků';
   const timed = sortMilestones(timeline).filter((m) => m.time !== null);
   const count = timeline.length;
-  const noun = count === 1 ? 'milestone' : 'milestones';
-  if (timed.length === 0) return `Transit day · ${count} ${noun}`;
+  const noun = count === 1 ? 'milník' : count >= 2 && count <= 4 ? 'milníky' : 'milníků';
+  if (timed.length === 0) return `Přesunový den · ${count} ${noun}`;
   const span =
     timed.length > 1 ? `${timed[0].time}–${timed[timed.length - 1].time}` : timed[0].time;
   return `${span} · ${count} ${noun}`;
 }
 
 const PACE_PRESETS = [
-  { label: 'Leisurely', kmh: 3, hint: 'Heavy pack or rough terrain' },
-  { label: 'Moderate', kmh: 4, hint: 'Typical hiking pace' },
-  { label: 'Fast', kmh: 5, hint: 'Light pack, experienced hiker' },
+  { label: 'Klidné', kmh: 3, hint: 'Těžký batoh nebo náročný terén' },
+  { label: 'Běžné', kmh: 4, hint: 'Typické turistické tempo' },
+  { label: 'Rychlé', kmh: 5, hint: 'Lehký batoh, zkušený turista' },
 ] as const;
 
 type PaceKmh = (typeof PACE_PRESETS)[number]['kmh'];
+
+function stageLabel(count: number): string {
+  if (count === 1) return 'etapa';
+  if (count >= 2 && count <= 4) return 'etapy';
+  return 'etap';
+}
 
 export default function TrailPage() {
   const { trailId } = useParams<{ trailId: string }>();
@@ -74,8 +80,8 @@ export default function TrailPage() {
   if (trail === null) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4">
-        <p className="text-muted-foreground">Trail not found.</p>
-        <Link href="/" className="text-sm text-primary hover:underline">Back to trails</Link>
+        <p className="text-muted-foreground">Trasa nebyla nalezena.</p>
+        <Link href="/" className="text-sm text-primary hover:underline">Zpět na trasy</Link>
       </div>
     );
   }
@@ -97,7 +103,7 @@ export default function TrailPage() {
         </div>
         <button
           onClick={() => setEditing((v) => !v)}
-          aria-label="Edit trail"
+          aria-label="Upravit trasu"
           className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
         >
           <PencilIcon className="h-4 w-4" />
@@ -107,7 +113,7 @@ export default function TrailPage() {
           className="flex h-9 items-center gap-1.5 rounded-full border px-3 text-sm font-medium hover:bg-muted"
         >
           <MapIcon className="h-4 w-4" />
-          Map
+          Mapa
         </Link>
       </div>
 
@@ -130,15 +136,15 @@ export default function TrailPage() {
 
       {/* Trail stats */}
       <div className="mb-5 grid grid-cols-3 gap-3">
-        <StatCard label="Distance" value={`${totalDistanceKm.toFixed(1)} km`} />
-        <StatCard label="Ascent" value={`${totalAscentM} m`} />
-        <StatCard label="Est. time" value={formatHours(totalHours)} />
+        <StatCard label="Vzdálenost" value={`${totalDistanceKm.toFixed(1)} km`} />
+        <StatCard label="Stoupání" value={`${totalAscentM} m`} />
+        <StatCard label="Odhad času" value={formatHours(totalHours)} />
       </div>
 
       {trail.start_date && (
         <div className="mb-5 flex items-center gap-2 text-sm text-muted-foreground">
           <CalendarIcon className="h-4 w-4" />
-          <span>Starts {trail.start_date}</span>
+          <span>Start {trail.start_date}</span>
           <span className="mx-1">·</span>
           <GaugeIcon className="h-4 w-4" />
           <span>{trail.default_pace_kmh} km/h</span>
@@ -147,13 +153,13 @@ export default function TrailPage() {
 
       {/* Stages */}
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="font-semibold">Stages</h2>
-        <InsertStageButton trailId={trailId} userId={trail.user_id} position={stages.length} label="Add stage" />
+        <h2 className="font-semibold">Etapy</h2>
+        <InsertStageButton trailId={trailId} userId={trail.user_id} position={stages.length} label="Přidat etapu" />
       </div>
 
       {stages.length === 0 ? (
         <div className="rounded-2xl border-2 border-dashed border-border px-6 py-8 text-center text-sm text-muted-foreground">
-          No stages yet. Add your first hiking day.
+          Zatím žádné etapy. Přidej první den na trase.
         </div>
       ) : (
         <div className="space-y-0">
@@ -207,16 +213,16 @@ export default function TrailPage() {
           className="flex w-full items-center justify-center gap-2 rounded-full border border-destructive/30 py-2.5 text-sm font-medium text-destructive hover:bg-destructive/5"
         >
           <Trash2Icon className="h-4 w-4" />
-          Delete trail
+          Smazat trasu
         </button>
       </div>
 
       <AlertDialog
         open={deleteOpen}
-        title="Delete trail?"
-        description={`"${trail.name}" and all its stages will be permanently deleted.`}
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
+        title="Smazat trasu?"
+        description={`"${trail.name}" a všechny její etapy budou trvale smazány.`}
+        confirmLabel="Smazat"
+        cancelLabel="Zrušit"
         destructive
         onConfirm={handleDelete}
         onCancel={() => setDeleteOpen(false)}
@@ -229,7 +235,7 @@ function TrailHeroPhoto({ trail, stageCount }: { trail: TrailRow; stageCount: nu
   return (
     <section
       className="relative mb-5 overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#2f373d_0%,#15191c_100%)] shadow-sm"
-      aria-label={`${trail.name} cover photo`}
+      aria-label={`Úvodní fotka trasy ${trail.name}`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
@@ -245,11 +251,11 @@ function TrailHeroPhoto({ trail, stageCount }: { trail: TrailRow; stageCount: nu
       <div className="relative flex min-h-[190px] flex-col justify-between gap-8 p-4 text-white">
         <div className="flex items-start justify-between gap-3">
           <span className="rounded-full bg-white/15 px-3 py-1 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-white/85 backdrop-blur">
-            Trail
+            Trasa
           </span>
           {stageCount > 0 && (
             <span className="rounded-full bg-black/30 px-3 py-1 text-xs font-semibold text-white/90 backdrop-blur">
-              {stageCount} {stageCount === 1 ? 'stage' : 'stages'}
+              {stageCount} {stageLabel(stageCount)}
             </span>
           )}
         </div>
@@ -303,14 +309,14 @@ function InsertStageButton({
           ? {
               trail_id: trailId,
               user_id: userId,
-              title: 'Travel day',
+              title: 'Přesunový den',
               stage_type: 'transit' as const,
               notes: null,
             }
           : {
               trail_id: trailId,
               user_id: userId,
-              title: `Day ${position + 1}`,
+              title: `Den ${position + 1}`,
               distance_km: 20,
               ascent_m: 500,
               descent_m: 500,
@@ -333,7 +339,7 @@ function InsertStageButton({
         className="flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
       >
         <FootprintsIcon className="h-3.5 w-3.5" />
-        Trek day
+        Den na trase
       </button>
       <button
         onClick={() => handleInsert('transit')}
@@ -341,15 +347,15 @@ function InsertStageButton({
         className="flex items-center gap-1.5 rounded-full border border-primary px-3 py-1.5 text-xs font-semibold text-primary disabled:opacity-50"
       >
         <ArrowRightLeftIcon className="h-3.5 w-3.5" />
-        Transit day
+        Přesunový den
       </button>
       <button
         onClick={() => setOpen(false)}
         disabled={pending}
-        aria-label="Cancel"
+        aria-label="Zrušit"
         className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
       >
-        Cancel
+        Zrušit
       </button>
     </div>
   );
@@ -378,7 +384,7 @@ function InsertStageButton({
       ) : (
         <button
           onClick={() => setOpen(true)}
-          aria-label={`Insert stage at position ${position + 1}`}
+          aria-label={`Vložit etapu na pozici ${position + 1}`}
           className="flex h-6 w-6 items-center justify-center rounded-full border bg-background text-muted-foreground hover:border-primary hover:text-primary"
         >
           <PlusIcon className="h-3 w-3" />
@@ -415,7 +421,7 @@ function EditTrailForm({
       const url = await uploadTrailCover(file, trail.id);
       setCoverUrl(url);
     } catch (err) {
-      setCoverError(err instanceof Error ? err.message : 'Upload failed.');
+        setCoverError(err instanceof Error ? err.message : 'Nahrání selhalo.');
     } finally {
       setUploading(false);
     }
@@ -438,11 +444,11 @@ function EditTrailForm({
 
   return (
     <form onSubmit={handleSubmit} className="mb-6 space-y-4 rounded-2xl border bg-card p-4">
-      <h2 className="font-semibold">Edit Trail</h2>
+      <h2 className="font-semibold">Upravit trasu</h2>
 
       {/* Cover photo */}
       <div className="space-y-1.5">
-        <label className="text-xs text-muted-foreground">Cover photo</label>
+        <label className="text-xs text-muted-foreground">Úvodní fotka</label>
         <input
           ref={fileRef}
           type="file"
@@ -453,7 +459,7 @@ function EditTrailForm({
         {coverUrl ? (
           <div className="relative overflow-hidden rounded-xl border">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={coverUrl} alt="Trail cover" className="h-32 w-full object-cover" />
+            <img src={coverUrl} alt="Úvodní fotka trasy" className="h-32 w-full object-cover" />
             <div className="absolute right-2 top-2 flex gap-2">
               <button
                 type="button"
@@ -461,12 +467,12 @@ function EditTrailForm({
                 disabled={uploading}
                 className="rounded-full bg-card/85 px-2.5 py-1 text-xs font-semibold backdrop-blur disabled:opacity-50"
               >
-                Change
+                Změnit
               </button>
               <button
                 type="button"
                 onClick={() => setCoverUrl(null)}
-                aria-label="Remove cover"
+                aria-label="Odebrat úvodní fotku"
                 className="flex h-6 w-6 items-center justify-center rounded-full bg-card/85 backdrop-blur"
               >
                 <XIcon className="h-3.5 w-3.5" />
@@ -485,7 +491,7 @@ function EditTrailForm({
             ) : (
               <>
                 <ImagePlusIcon className="h-5 w-5" />
-                Add cover photo
+                Přidat úvodní fotku
               </>
             )}
           </button>
@@ -494,30 +500,30 @@ function EditTrailForm({
       </div>
 
       <div className="space-y-1.5">
-        <label className="text-xs text-muted-foreground">Trail name</label>
+        <label className="text-xs text-muted-foreground">Název trasy</label>
         <input
           name="name"
           defaultValue={trail.name}
           required
-          placeholder="Trail name"
+          placeholder="Název trasy"
           className="input"
         />
       </div>
 
       <div className="space-y-1.5">
-        <label className="text-xs text-muted-foreground">Description</label>
+        <label className="text-xs text-muted-foreground">Popis</label>
         <textarea
           name="description"
           rows={3}
           defaultValue={trail.description ?? ''}
-          placeholder="A short description of your hike…"
+          placeholder="Krátký popis tvé cesty…"
           maxLength={1000}
           className="input resize-none"
         />
       </div>
 
       <div className="space-y-1.5">
-        <label className="text-xs text-muted-foreground">Start date</label>
+        <label className="text-xs text-muted-foreground">Datum startu</label>
         <input
           name="start_date"
           type="date"
@@ -527,7 +533,7 @@ function EditTrailForm({
       </div>
 
       <div className="space-y-2">
-        <span className="text-xs text-muted-foreground">Default pace</span>
+        <span className="text-xs text-muted-foreground">Výchozí tempo</span>
         <div className="grid grid-cols-3 gap-2">
           {PACE_PRESETS.map((opt) => (
             <button
@@ -552,14 +558,14 @@ function EditTrailForm({
 
       <div className="flex gap-2">
         <button type="button" onClick={onDone} className="flex-1 rounded-full border py-2.5 text-sm font-medium hover:bg-muted">
-          Cancel
+          Zrušit
         </button>
         <button
           type="submit"
           disabled={pending}
           className="flex-1 rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
         >
-          {pending ? 'Saving…' : 'Save'}
+          {pending ? 'Ukládám…' : 'Uložit'}
         </button>
       </div>
     </form>

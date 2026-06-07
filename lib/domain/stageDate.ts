@@ -25,7 +25,7 @@ export function stageDate(
 
 /** Short, human display of an ISO date, e.g. "Mon 1 Jun". Date-only, no TZ shift. */
 export function formatStageDate(iso: string): string {
-  return new Date(iso + 'T00:00:00Z').toLocaleDateString('en-GB', {
+  return new Date(iso + 'T00:00:00Z').toLocaleDateString('cs-CZ', {
     weekday: 'short',
     day: 'numeric',
     month: 'short',

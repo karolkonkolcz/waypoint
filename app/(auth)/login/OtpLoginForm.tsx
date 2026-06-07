@@ -235,7 +235,7 @@ function EmailStep({ email, error, message, pending, onEmailChange, onSubmit }: 
 
       <p className="flex items-start gap-3 rounded-2xl border border-white/14 bg-white/12 px-4 py-3 text-sm font-medium leading-relaxed text-white/76 backdrop-blur-md">
         <ShieldCheckIcon className="mt-0.5 size-5 shrink-0 text-white/78" strokeWidth={1.9} />
-        <span>Stačí se jednou připojit. Trasy pak zůstanou offline.</span>
+        <span>Stačí se jednou připojit. Trasy pak zůstanou dostupné bez připojení.</span>
       </p>
 
       <p className="text-center text-sm font-medium leading-relaxed text-white/62">
@@ -351,7 +351,7 @@ function VerifyStep({
 
       <div className="flex items-start gap-3 rounded-2xl border border-white/14 bg-white/12 px-4 py-3 text-sm font-medium leading-relaxed text-white/76 backdrop-blur-md">
         <ShieldCheckIcon className="mt-0.5 size-5 shrink-0 text-white/78" strokeWidth={1.9} />
-        <p>Po přihlášení zůstanou stažené trasy, počasí i mapy dostupné offline.</p>
+        <p>Po přihlášení zůstanou stažené trasy, počasí i mapy dostupné bez připojení.</p>
       </div>
     </form>
   );

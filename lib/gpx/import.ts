@@ -30,7 +30,7 @@ export interface TrekImportResult {
 export function deriveTrailName(fileName: string): string {
   const base = fileName.replace(/\.gpx$/i, '').replace(/^export[-_\s]*/i, '');
   const words = base.replace(/[-_]+/g, ' ').trim();
-  if (!words) return 'Imported trek';
+  if (!words) return 'Importovaný trek';
   return words.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
@@ -54,7 +54,7 @@ export async function importTrek(
   tracks: ParsedTrack[],
   opts: TrekImportOptions,
 ): Promise<TrekImportResult> {
-  if (tracks.length === 0) throw new Error('No tracks to import');
+  if (tracks.length === 0) throw new Error('Nejsou dostupné žádné trasy k importu');
 
   const trail = await trailRepo.create({
     user_id: opts.userId,
@@ -72,7 +72,7 @@ export async function importTrek(
     const stage = await stageRepo.create({
       trail_id: trail.id,
       user_id: opts.userId,
-      title: t.name ?? `Day ${i + 1}`,
+      title: t.name ?? `Den ${i + 1}`,
       order_index: i,
       distance_km: t.total_distance_km,
       ascent_m: t.total_ascent_m,

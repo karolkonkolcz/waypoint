@@ -55,10 +55,10 @@ export async function uploadWelcomePhoto(file: File): Promise<{
   storagePath: string;
 }> {
   if (!file.type.startsWith('image/')) {
-    throw new Error('Please choose an image file.');
+    throw new Error('Vyber prosím soubor obrázku.');
   }
   if (file.size > MAX_BYTES) {
-    throw new Error('Image is too large (max 10 MB).');
+    throw new Error('Obrázek je příliš velký (max. 10 MB).');
   }
 
   const { blob, ext, type } = await toWebp(file);

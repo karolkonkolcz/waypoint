@@ -16,9 +16,17 @@ const DIFFICULTY_GRADIENT: Record<DifficultyClass | 'default', string> = {
   default: 'linear-gradient(135deg, #3a4750 0%, #1b1f22 100%)',
 };
 
-/** "hard" → "Hard" for chip display. */
-function titleCase(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
+const DIFFICULTY_LABEL: Record<DifficultyClass, string> = {
+  easy: 'Snadná',
+  moderate: 'Střední',
+  hard: 'Těžká',
+  extreme: 'Extrémní',
+};
+
+function dayLabel(count: number): string {
+  if (count === 1) return 'den';
+  if (count >= 2 && count <= 4) return 'dny';
+  return 'dní';
 }
 
 export function ActiveTrekHero({
@@ -48,7 +56,7 @@ export function ActiveTrekHero({
       {/* Stretched link — the whole card opens the trek detail (all days). */}
       <Link
         href={trailHref}
-        aria-label={`Open ${trail.name}`}
+        aria-label={`Otevřít ${trail.name}`}
         className="absolute inset-0 z-10"
       />
       {/* Difficulty gradient is the base; the cover photo overlays it when it
@@ -71,10 +79,10 @@ export function ActiveTrekHero({
 
       <div className="relative flex min-h-[164px] flex-col justify-between gap-3 p-4 pb-6 text-white">
         <div className="flex items-center justify-between">
-          <Eyebrow className="text-white/75">Active trek</Eyebrow>
+          <Eyebrow className="text-white/75">Aktivní přechod</Eyebrow>
           {difficultyClass && (
             <Chip tone="brand" className="shadow-sm">
-              {titleCase(difficultyClass)}
+              {DIFFICULTY_LABEL[difficultyClass]}
             </Chip>
           )}
         </div>
@@ -88,13 +96,13 @@ export function ActiveTrekHero({
             <span className="text-sm font-medium text-white/90">
               {dayNumber ? (
                 <>
-                  Day <span className="font-mono font-semibold tabular-nums">{dayNumber}</span> of{' '}
+                  Den <span className="font-mono font-semibold tabular-nums">{dayNumber}</span> z{' '}
                   <span className="font-mono font-semibold tabular-nums">{totalDays}</span>
                 </>
               ) : (
                 <>
                   <span className="font-mono font-semibold tabular-nums">{totalDays}</span>{' '}
-                  {totalDays === 1 ? 'day' : 'days'}
+                  {dayLabel(totalDays)}
                 </>
               )}
             </span>
@@ -102,7 +110,7 @@ export function ActiveTrekHero({
               href={todayHref}
               className="relative z-20 inline-flex items-center gap-0.5 rounded-full bg-[var(--wp-orange)] px-3 py-1.5 text-sm font-semibold text-white shadow-md active:scale-95"
             >
-              Today
+              Dnes
               <ChevronRightIcon className="h-4 w-4" />
             </Link>
           </div>

@@ -12,6 +12,12 @@ interface Props {
 
 type Status = 'idle' | 'preview' | 'error';
 
+function dayLabel(count: number): string {
+  if (count === 1) return 'den';
+  if (count >= 2 && count <= 4) return 'dny';
+  return 'dní';
+}
+
 export function GpxImportZone({ userId }: Props) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -32,7 +38,7 @@ export function GpxImportZone({ userId }: Props) {
       setStartDate('');
       setStatus('preview');
     } catch (err) {
-      setError(err instanceof GPXParseError ? err.message : 'Failed to read GPX file');
+      setError(err instanceof GPXParseError ? err.message : 'Soubor GPX se nepodařilo přečíst');
       setStatus('error');
     }
   }
@@ -54,7 +60,7 @@ export function GpxImportZone({ userId }: Props) {
       });
       router.push(`/trails/${trailId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Import failed');
+      setError(err instanceof Error ? err.message : 'Import selhal');
       setImporting(false);
       setStatus('error');
     }
@@ -76,21 +82,21 @@ export function GpxImportZone({ userId }: Props) {
         {fileInput}
         <div className="flex items-center gap-2">
           <MountainSnowIcon className="h-5 w-5 text-primary" />
-          <h2 className="font-semibold">Import trek</h2>
+          <h2 className="font-semibold">Importovat trek</h2>
         </div>
 
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">Trail name</label>
+          <label className="text-xs text-muted-foreground">Název trasy</label>
           <input
             value={trailName}
             onChange={(e) => setTrailName(e.target.value)}
             className="input"
-            placeholder="Trail name"
+            placeholder="Název trasy"
           />
         </div>
 
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">Start date (optional — enables weather)</label>
+          <label className="text-xs text-muted-foreground">Datum startu (volitelné — zapne počasí)</label>
           <input
             type="date"
             value={startDate}
@@ -101,7 +107,7 @@ export function GpxImportZone({ userId }: Props) {
 
         <div className="rounded-xl bg-muted/40 px-3 py-2 text-sm">
           <span className="font-medium tabular-nums">
-            {preview.tracks.length} days · {preview.totalDistanceKm} km · ↑{preview.totalAscentM} m
+            {preview.tracks.length} {dayLabel(preview.tracks.length)} · {preview.totalDistanceKm} km · ↑{preview.totalAscentM} m
           </span>
         </div>
 
@@ -113,7 +119,7 @@ export function GpxImportZone({ userId }: Props) {
             >
               <span className="truncate">
                 <span className="mr-2 text-muted-foreground tabular-nums">{i + 1}.</span>
-                {t.name ?? `Day ${i + 1}`}
+                {t.name ?? `Den ${i + 1}`}
               </span>
               <span className="shrink-0 tabular-nums text-muted-foreground">
                 {t.total_distance_km} km · ↑{t.total_ascent_m} m
@@ -127,14 +133,14 @@ export function GpxImportZone({ userId }: Props) {
             onClick={reset}
             className="flex-1 rounded-full border py-2.5 text-sm font-medium hover:bg-muted"
           >
-            Cancel
+            Zrušit
           </button>
           <button
             onClick={handleConfirm}
             disabled={importing}
             className="flex-1 rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
           >
-            {importing ? 'Importing…' : 'Create trail'}
+            {importing ? 'Importuji…' : 'Vytvořit trasu'}
           </button>
         </div>
       </div>
@@ -150,7 +156,7 @@ export function GpxImportZone({ userId }: Props) {
         className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/60 hover:bg-muted/30"
       >
         <UploadCloudIcon className="h-5 w-5" />
-        Import GPX trek
+        Importovat GPX trek
       </button>
       {status === 'error' && (
         <div className="mt-2 flex items-center gap-2 text-xs text-destructive">

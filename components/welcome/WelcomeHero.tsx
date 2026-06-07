@@ -11,10 +11,10 @@ import { WaypointLockup } from '@/components/brand/Waypoint';
 import type { WelcomePhoto } from '@/lib/welcome/photos';
 
 const FEATURES = [
-  { label: 'Offline stages', icon: DownloadIcon },
-  { label: 'ETA timeline', icon: ClockIcon },
-  { label: 'Weather alerts', icon: AlertTriangleIcon },
-  { label: 'Cached maps', icon: CloudSunIcon },
+  { label: 'Etapy bez připojení', icon: DownloadIcon },
+  { label: 'Časová osa ETA', icon: ClockIcon },
+  { label: 'Výstrahy počasí', icon: AlertTriangleIcon },
+  { label: 'Stažené mapy', icon: CloudSunIcon },
 ];
 
 export function WelcomeHero({ photo }: { photo: WelcomePhoto | null }) {
@@ -44,26 +44,26 @@ export function WelcomeHero({ photo }: { photo: WelcomePhoto | null }) {
           <WaypointLockup markSize={42} wordmarkClassName="!text-white" />
           <div className="flex items-center gap-2 text-right text-xs font-semibold uppercase text-white/72">
             <MapIcon className="hidden h-4 w-4 sm:block" />
-            {photo?.location_label ?? 'High Tatras'}
+            {photo?.location_label ?? 'Vysoké Tatry'}
           </div>
         </header>
 
         <section className="mt-auto space-y-6 pb-1">
           <div className="space-y-4">
             <p className="text-xs font-semibold uppercase text-[var(--wp-orange)]">
-              Offline-first trail companion
+              Průvodce po trase bez připojení
             </p>
             <div className="space-y-4">
               <h1 className="text-4xl font-extrabold leading-tight text-white drop-shadow-sm min-[390px]:text-5xl">
-                Hike beyond the signal.
+                Vyraz i mimo signál.
               </h1>
               <p className="text-lg font-medium leading-snug text-white/80">
-                Plan stages, check ETA, weather and cached maps — even when the signal disappears.
+                Plánuj etapy, sleduj ETA, počasí a stažené mapy i tam, kde signál zmizí.
               </p>
             </div>
           </div>
 
-          <ul className="grid grid-cols-2 gap-3" aria-label="Waypoint highlights">
+          <ul className="grid grid-cols-2 gap-3" aria-label="Hlavní funkce Waypointu">
             {FEATURES.map(({ label, icon: Icon }) => (
               <li key={label}>
                 <span className="flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/18 bg-white/14 px-3 text-sm font-semibold text-white shadow-sm backdrop-blur-md">
@@ -79,13 +79,13 @@ export function WelcomeHero({ photo }: { photo: WelcomePhoto | null }) {
               href="/login?next=/onboarding"
               className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-[var(--wp-orange)] px-5 text-center text-base font-semibold text-white shadow-[0_18px_40px_rgba(243,112,19,0.35)] transition hover:bg-[var(--wp-orange-700)] active:scale-[0.99]"
             >
-              Create free account
+              Vytvořit účet zdarma
               <ArrowRightIcon className="h-5 w-5" />
             </Link>
             <p className="text-center text-sm font-semibold text-white/70">
-              Already have an account?{' '}
+              Už máš účet?{' '}
               <Link href="/login" className="text-white underline decoration-2 underline-offset-4">
-                Log in
+                Přihlásit se
               </Link>
             </p>
           </div>

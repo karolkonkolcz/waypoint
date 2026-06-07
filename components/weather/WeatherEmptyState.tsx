@@ -13,28 +13,28 @@ interface Props {
 
 const COPY: Record<Variant, { title: string; body: string; Icon: typeof CloudOffIcon }> = {
   'offline-no-cache': {
-    title: 'Weather needs a connection',
-    body: 'Weather for your current position requires a connection. Open a trail while online to cache its forecast for offline use.',
+    title: 'Počasí potřebuje připojení',
+    body: 'Počasí pro aktuální polohu vyžaduje připojení. Otevři trasu s připojením, aby se její předpověď uložila pro použití bez připojení.',
     Icon: WifiOffIcon,
   },
   'permission-denied': {
-    title: 'Location is off',
-    body: 'Enable location to see weather for your position.',
+    title: 'Poloha je vypnutá',
+    body: 'Povol polohu, aby se zobrazilo počasí pro tvoje místo.',
     Icon: MapPinOffIcon,
   },
   'position-unavailable': {
-    title: "Couldn't find your position",
-    body: 'Your location is unavailable right now. Try again in a moment.',
+    title: 'Polohu se nepodařilo zjistit',
+    body: 'Tvoje poloha teď není dostupná. Zkus to za chvíli znovu.',
     Icon: MapPinOffIcon,
   },
   'fetch-failed': {
-    title: 'Weather unavailable',
-    body: "Couldn't load the forecast. Check your connection and try again.",
+    title: 'Počasí není dostupné',
+    body: 'Předpověď se nepodařilo načíst. Zkontroluj připojení a zkus to znovu.',
     Icon: CloudOffIcon,
   },
   'radar-offline': {
-    title: 'Radar needs a connection',
-    body: 'Live precipitation radar requires a connection.',
+    title: 'Radar potřebuje připojení',
+    body: 'Živý srážkový radar vyžaduje připojení.',
     Icon: RadarIcon,
   },
 };
@@ -61,7 +61,7 @@ export default function WeatherEmptyState({ reason, onRetry }: Props) {
           onClick={onRetry}
           className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground active:scale-95"
         >
-          Try again
+          Zkusit znovu
         </button>
       )}
     </div>

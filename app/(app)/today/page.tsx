@@ -254,12 +254,12 @@ export default function TodayPage() {
       <div className="mx-auto max-w-lg px-4 pt-6">
         <h1 className="mb-4 text-2xl font-bold">{getGreeting(new Date(), name)}</h1>
         <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed px-6 py-10 text-center">
-          <p className="font-semibold">No hike planned for today</p>
+          <p className="font-semibold">Na dnešek není naplánovaná žádná etapa</p>
           <p className="text-sm text-muted-foreground">
-            Nothing scheduled on {activeTrail.name} for today.
+            Na trase {activeTrail.name} dnes nic naplánovaného není.
           </p>
           <Link href={`/trails/${activeTrail.id}`} className="text-sm font-semibold text-primary hover:underline">
-            View {activeTrail.name}
+            Zobrazit {activeTrail.name}
           </Link>
         </div>
       </div>
@@ -288,7 +288,7 @@ export default function TodayPage() {
           {todayStage.location_name && (
             <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
               <MapPinIcon className="h-3.5 w-3.5" />
-              Weather for {todayStage.location_name}
+              Počasí pro {todayStage.location_name}
             </p>
           )}
         </div>
@@ -316,7 +316,7 @@ export default function TodayPage() {
             {/* Tap affordance — the hero opens today's stage on the map. */}
             <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-card/85 px-2.5 py-1 text-[11px] font-semibold backdrop-blur">
               <MapIcon className="h-3 w-3" />
-              Map
+              Mapa
             </span>
 
             {/* Route name */}
@@ -334,8 +334,8 @@ export default function TodayPage() {
 
           {/* Stat tiles — distance / ascent / ETA */}
           <div className="mt-2 grid grid-cols-3 gap-2">
-            <StatTileCard value={`${todayStage.distance_km} km`} label="Distance" />
-            <StatTileCard value={`+${todayStage.ascent_m} m`} label="Ascent" />
+            <StatTileCard value={`${todayStage.distance_km} km`} label="Vzdálenost" />
+            <StatTileCard value={`+${todayStage.ascent_m} m`} label="Stoupání" />
             <StatTileCard value={eta} label="ETA" />
           </div>
         </div>
@@ -361,7 +361,7 @@ export default function TodayPage() {
       {/* Block 3.5 — Stage notes (date-aware via todayStage) */}
       {todayStage.notes && (
         <section className="rounded-2xl border bg-card p-4">
-          <Eyebrow className="mb-2 block">Notes</Eyebrow>
+          <Eyebrow className="mb-2 block">Poznámky</Eyebrow>
           <p className="whitespace-pre-wrap text-sm leading-relaxed">{todayStage.notes}</p>
         </section>
       )}
@@ -389,7 +389,7 @@ function StatTileCard({ label, value }: { label: string; value: string }) {
 }
 
 // Bold the day's difficulty word + any HH:MM times so the briefing scans fast.
-const EMPHASIS_RE = /(\b\d{1,2}:\d{2}\b|\b(?:easy|moderate|hard|tough)\b)/gi;
+const EMPHASIS_RE = /(\b\d{1,2}:\d{2}\b|snadný|středně náročný|těžký|extrémní)/gi;
 
 function emphasizeSummary(text: string): React.ReactNode[] {
   return text.split(EMPHASIS_RE).map((part, i) =>
@@ -408,10 +408,10 @@ function EmptyToday({ greeting }: { greeting: string }) {
     <div className="mx-auto max-w-lg px-4 pt-6">
       <h1 className="mb-4 text-2xl font-bold">{greeting}</h1>
       <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed px-6 py-10 text-center">
-        <p className="font-semibold">No hike planned for today</p>
-        <p className="text-sm text-muted-foreground">Create a trail to start planning your hike.</p>
+        <p className="font-semibold">Na dnešek není naplánovaná žádná etapa</p>
+        <p className="text-sm text-muted-foreground">Vytvoř trasu a začni plánovat cestu.</p>
         <Link href="/" className="text-sm font-semibold text-primary hover:underline">
-          Go to Trails
+          Přejít na trasy
         </Link>
       </div>
     </div>

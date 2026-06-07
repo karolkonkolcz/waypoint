@@ -55,11 +55,11 @@ function extractPoints(xml: string): RawPoint[] {
 
     const latM = LAT_RE.exec(attrs);
     const lonM = LON_RE.exec(attrs);
-    if (!latM || !lonM) throw new GPXParseError('Track point is missing valid lat/lon attributes');
+    if (!latM || !lonM) throw new GPXParseError('Bodu trasy chybí platné atributy lat/lon');
 
     const lat = parseFloat(latM[1]);
     const lon = parseFloat(lonM[1]);
-    if (isNaN(lat) || isNaN(lon)) throw new GPXParseError('Track point has invalid lat/lon value');
+    if (isNaN(lat) || isNaN(lon)) throw new GPXParseError('Bod trasy má neplatnou hodnotu lat/lon');
 
     const eleM = ELE_RE.exec(body);
     const ele = eleM ? parseFloat(eleM[1]) : 0;
@@ -85,7 +85,7 @@ function downsampleProfile(
 /** Computes geometry + statistics from an ordered list of raw points. */
 function buildFromPoints(points: RawPoint[]): ParsedGPX {
   if (points.length < 2) {
-    throw new GPXParseError('GPX must contain at least 2 track points');
+    throw new GPXParseError('GPX musí obsahovat alespoň 2 body trasy');
   }
 
   // GeoJSON coordinates: [lon, lat, ele]
@@ -193,7 +193,7 @@ export function parseGPXTracks(xmlText: string): ParsedTrack[] {
   }
 
   if (tracks.length === 0) {
-    throw new GPXParseError('GPX contains no track with at least 2 points');
+    throw new GPXParseError('GPX neobsahuje žádnou trasu s alespoň 2 body');
   }
 
   return orderTracks(tracks);

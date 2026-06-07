@@ -207,35 +207,35 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
 
   return (
     <div className="mb-6 space-y-5 rounded-2xl border bg-card p-4">
-      <h2 className="font-semibold">Edit Transit Day</h2>
+      <h2 className="font-semibold">Upravit přesunový den</h2>
 
       <div className="space-y-1.5">
-        <label className="text-xs text-muted-foreground">Title</label>
+        <label className="text-xs text-muted-foreground">Název</label>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
-          placeholder="e.g. Arrival in Bastia"
+          placeholder="např. Příjezd do Bastie"
           className="input"
         />
       </div>
 
       <div className="space-y-1.5">
-        <label className="text-xs text-muted-foreground">Date</label>
+        <label className="text-xs text-muted-foreground">Datum</label>
         <input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
           className="input"
         />
-        <p className="text-xs text-muted-foreground">Leave empty to follow the trail start date.</p>
+        <p className="text-xs text-muted-foreground">Nech prázdné, pokud se má datum řídit startem trasy.</p>
       </div>
 
       {/* Timeline editor */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Timeline
+            Časová osa
           </span>
           <button
             type="button"
@@ -243,13 +243,13 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
             className="flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground"
           >
             <PlusIcon className="h-3.5 w-3.5" />
-            Add
+            Přidat
           </button>
         </div>
 
         {items.length === 0 ? (
           <p className="rounded-xl border-2 border-dashed border-border px-4 py-6 text-center text-xs text-muted-foreground">
-            No milestones. Add bus, flight or transfer times.
+            Zatím žádné milníky. Přidej časy autobusů, letů nebo přestupů.
           </p>
         ) : (
           <div className="space-y-3">
@@ -269,7 +269,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
                     <input
                       value={m.title}
                       onChange={(e) => patch(m.id, { title: e.target.value })}
-                      placeholder="Title"
+                      placeholder="Název"
                       className="input"
                     />
                   </div>
@@ -292,7 +292,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
                     <input
                       value={m.location ?? ''}
                       onChange={(e) => patch(m.id, { location: e.target.value || null })}
-                      placeholder="Location (optional)"
+                      placeholder="Místo (volitelné)"
                       className="input"
                     />
                   </div>
@@ -300,7 +300,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
                 <input
                   value={m.notes ?? ''}
                   onChange={(e) => patch(m.id, { notes: e.target.value || null })}
-                  placeholder="Notes (optional)"
+                  placeholder="Poznámky (volitelné)"
                   className="input"
                 />
                 <div className="flex items-center justify-end gap-1">
@@ -308,7 +308,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
                     type="button"
                     onClick={() => move(m.id, -1)}
                     disabled={idx === 0}
-                    aria-label="Move up"
+                    aria-label="Posunout nahoru"
                     className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted disabled:opacity-30"
                   >
                     <ChevronUpIcon className="h-4 w-4" />
@@ -317,7 +317,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
                     type="button"
                     onClick={() => move(m.id, 1)}
                     disabled={idx === items.length - 1}
-                    aria-label="Move down"
+                    aria-label="Posunout dolů"
                     className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted disabled:opacity-30"
                   >
                     <ChevronDownIcon className="h-4 w-4" />
@@ -325,7 +325,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
                   <button
                     type="button"
                     onClick={() => remove(m.id)}
-                    aria-label="Delete milestone"
+                    aria-label="Smazat milník"
                     className="flex h-7 w-7 items-center justify-center rounded-full text-destructive hover:bg-destructive/10"
                   >
                     <Trash2Icon className="h-4 w-4" />
@@ -340,7 +340,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
       {/* Weather anchor — search a place, coordinates fill in automatically. */}
       <div className="space-y-2">
         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Weather location
+          Místo pro počasí
         </span>
 
         {hasAnchor ? (
@@ -348,7 +348,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
             <MapPinIcon className="h-4 w-4 shrink-0 text-primary" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">
-                {locationName.trim() || 'Custom location'}
+                {locationName.trim() || 'Vlastní místo'}
               </p>
               <p className="text-xs text-muted-foreground">
                 {lat}, {lon}
@@ -357,7 +357,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
             <button
               type="button"
               onClick={clearAnchor}
-              aria-label="Clear weather location"
+              aria-label="Vymazat místo pro počasí"
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full hover:bg-muted"
             >
               <XIcon className="h-4 w-4" />
@@ -369,7 +369,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search a place (e.g. Bastia)"
+              placeholder="Vyhledat místo (např. Bastia)"
               className="input pl-9"
               autoComplete="off"
             />
@@ -396,7 +396,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
         )}
 
         {!hasAnchor && query.trim().length >= 2 && !searching && results.length === 0 && (
-          <p className="text-xs text-muted-foreground">No places found for “{query.trim()}”.</p>
+          <p className="text-xs text-muted-foreground">Pro „{query.trim()}“ se nenašla žádná místa.</p>
         )}
 
         {!hasAnchor && (neighbours.prevEnd || neighbours.nextStart) && (
@@ -408,7 +408,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
                 className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium hover:bg-accent"
               >
                 <MapPinIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                End of previous day
+                Konec předchozího dne
               </button>
             )}
             {neighbours.nextStart && (
@@ -418,7 +418,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
                 className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium hover:bg-accent"
               >
                 <MapPinIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                Start of next day
+                Začátek dalšího dne
               </button>
             )}
           </div>
@@ -430,7 +430,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
             onClick={() => setShowMap((v) => !v)}
             className="text-xs text-muted-foreground underline-offset-2 hover:underline"
           >
-            {showMap ? 'Hide map' : 'Pick on map'}
+            {showMap ? 'Skrýt mapu' : 'Vybrat na mapě'}
           </button>
           {!hasAnchor && (
             <button
@@ -438,7 +438,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
               onClick={() => setShowManual((v) => !v)}
               className="text-xs text-muted-foreground underline-offset-2 hover:underline"
             >
-              {showManual ? 'Hide manual entry' : 'Enter coordinates manually'}
+              {showManual ? 'Skrýt ruční zadání' : 'Zadat souřadnice ručně'}
             </button>
           )}
         </div>
@@ -458,7 +458,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
           <div className="space-y-1">
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">Latitude</label>
+                <label className="text-xs text-muted-foreground">Zeměpisná šířka</label>
                 <input
                   value={lat}
                   onChange={(e) => setLat(e.target.value)}
@@ -469,7 +469,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">Longitude</label>
+                <label className="text-xs text-muted-foreground">Zeměpisná délka</label>
                 <input
                   value={lon}
                   onChange={(e) => setLon(e.target.value)}
@@ -481,32 +481,32 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
               </div>
             </div>
             {latError && (
-              <p className="text-xs text-destructive">Latitude must be a number between −90 and 90.</p>
+              <p className="text-xs text-destructive">Zeměpisná šířka musí být číslo mezi −90 a 90.</p>
             )}
             {lonError && (
-              <p className="text-xs text-destructive">Longitude must be a number between −180 and 180.</p>
+              <p className="text-xs text-destructive">Zeměpisná délka musí být číslo mezi −180 a 180.</p>
             )}
             {partialCoords && !latError && !lonError && (
-              <p className="text-xs text-destructive">Enter both latitude and longitude.</p>
+              <p className="text-xs text-destructive">Zadej zeměpisnou šířku i délku.</p>
             )}
           </div>
         )}
 
         <p className="text-xs text-muted-foreground">
           {hasAnchor
-            ? 'Forecast will be shown for this day. Tap the map to adjust.'
-            : 'Search or tap the map to show a forecast for this day.'}
+            ? 'Pro tento den se zobrazí předpověď. Klepnutím do mapy místo upravíš.'
+            : 'Vyhledej místo nebo klepni do mapy, aby se pro tento den zobrazila předpověď.'}
         </p>
       </div>
 
       {/* Notes */}
       <div className="space-y-1.5">
-        <label className="text-xs text-muted-foreground">Notes</label>
+        <label className="text-xs text-muted-foreground">Poznámky</label>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
-          placeholder="Notes…"
+          placeholder="Poznámky…"
           className="input resize-none"
         />
       </div>
@@ -517,7 +517,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
           onClick={onDone}
           className="flex-1 rounded-full border py-2.5 text-sm font-medium hover:bg-muted"
         >
-          Cancel
+          Zrušit
         </button>
         <button
           type="button"
@@ -525,7 +525,7 @@ export function TransitEditForm({ stage, onDone }: { stage: StageRow; onDone: ()
           disabled={pending || title.trim() === '' || coordsInvalid}
           className="flex-1 rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
         >
-          {pending ? 'Saving…' : 'Save'}
+          {pending ? 'Ukládám…' : 'Uložit'}
         </button>
       </div>
     </div>
