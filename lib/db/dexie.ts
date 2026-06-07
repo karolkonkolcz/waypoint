@@ -18,6 +18,8 @@ export interface TrailRow extends Sync {
   start_date: string | null;
   default_pace_kmh: number;
   preferences: Record<string, unknown>;
+  // Optional cover photo (Supabase Storage URL) for the Home hero + trail cards.
+  cover_image_url: string | null;
 }
 
 export interface RouteRow extends Sync {
@@ -232,6 +234,17 @@ class WaypointDB extends Dexie {
     this.version(7).stores({
       ephemeral_weather: '&cacheKey, fetched_at',
     });
+
+    // v8: trail cover image. Backfill existing rows to null. No index — read
+    // with the already-loaded trail, never queried on directly.
+    this.version(8).upgrade((tx) =>
+      tx
+        .table<TrailRow>('trails')
+        .toCollection()
+        .modify((t) => {
+          if (t.cover_image_url === undefined) t.cover_image_url = null;
+        }),
+    );
   }
 }
 

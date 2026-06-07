@@ -7,6 +7,7 @@ export const trailSchema = z.object({
   start_date: z.string().nullable(),
   default_pace_kmh: z.number().positive().max(20),
   preferences: z.record(z.string(), z.unknown()).default({}),
+  cover_image_url: z.string().nullable().default(null),
 });
 
 export const milestoneSchema = z.object({

@@ -113,6 +113,30 @@ export async function pull(userId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Observable sync status — backs the Home "Synced" chip. Combine with
+// navigator.onLine in the UI (see useSyncStatus) for the offline state.
+// ---------------------------------------------------------------------------
+export type SyncStatus = 'idle' | 'syncing' | 'error';
+
+let status: SyncStatus = 'idle';
+const statusListeners = new Set<(s: SyncStatus) => void>();
+
+export function getSyncStatus(): SyncStatus {
+  return status;
+}
+
+export function subscribeSyncStatus(cb: (s: SyncStatus) => void): () => void {
+  statusListeners.add(cb);
+  return () => statusListeners.delete(cb);
+}
+
+function setStatus(next: SyncStatus): void {
+  if (next === status) return;
+  status = next;
+  for (const cb of statusListeners) cb(next);
+}
+
+// ---------------------------------------------------------------------------
 // sync() — push then pull; guards against concurrent runs
 // ---------------------------------------------------------------------------
 let running = false;
@@ -120,9 +144,14 @@ let running = false;
 export async function sync(userId: string): Promise<void> {
   if (running) return;
   running = true;
+  setStatus('syncing');
   try {
     await push();
     await pull(userId);
+    setStatus('idle');
+  } catch (err) {
+    setStatus('error');
+    throw err;
   } finally {
     running = false;
   }

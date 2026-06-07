@@ -11,6 +11,7 @@ function trail(id: string, start_date: string | null): TrailRow {
     start_date,
     default_pace_kmh: 4,
     preferences: {},
+    cover_image_url: null,
     created_at: '',
     updated_at: '',
     deleted_at: null,

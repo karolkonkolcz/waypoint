@@ -3,10 +3,10 @@ import { newId, nowIso, enqueue } from './base';
 
 export type CreateTrailInput = Pick<TrailRow,
   'user_id' | 'name' | 'description' | 'start_date' | 'default_pace_kmh' | 'preferences'
->;
+> & { cover_image_url?: string | null };
 
 export type UpdateTrailInput = Partial<Pick<TrailRow,
-  'name' | 'description' | 'start_date' | 'default_pace_kmh' | 'preferences'
+  'name' | 'description' | 'start_date' | 'default_pace_kmh' | 'preferences' | 'cover_image_url'
 >>;
 
 
@@ -29,6 +29,7 @@ export const trailRepo = {
     const now = nowIso();
     const row: TrailRow = {
       id: newId(),
+      cover_image_url: null,
       ...input,
       created_at: now,
       updated_at: now,

@@ -236,6 +236,7 @@ export type Database = {
       }
       trails: {
         Row: {
+          cover_image_url: string | null
           created_at: string
           default_pace_kmh: number
           deleted_at: string | null
@@ -248,6 +249,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          cover_image_url?: string | null
           created_at?: string
           default_pace_kmh?: number
           deleted_at?: string | null
@@ -260,6 +262,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          cover_image_url?: string | null
           created_at?: string
           default_pace_kmh?: number
           deleted_at?: string | null
