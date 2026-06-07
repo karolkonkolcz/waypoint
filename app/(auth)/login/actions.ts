@@ -8,11 +8,11 @@ const emailSchema = z.string().trim().email();
 const otpSchema = z
   .string()
   .trim()
-  .min(4, 'Enter the verification code from your email')
-  .max(12, 'Verification code is too long')
+  .min(4, 'Zadej ověřovací kód z e-mailu')
+  .max(12, 'Ověřovací kód je příliš dlouhý')
   .regex(
     /^[A-Za-z0-9]+$/,
-    'Verification code can only contain letters and numbers',
+    'Ověřovací kód může obsahovat jen písmena a číslice',
   );
 
 export type AuthActionResult = { ok: true } | { error: string };
@@ -29,7 +29,7 @@ function safeNextPath(next: string): string {
 
 export async function sendOtpCode(email: string): Promise<AuthActionResult> {
   const parsedEmail = parseEmail(email);
-  if (!parsedEmail) return { error: 'Enter a valid email address' };
+  if (!parsedEmail) return { error: 'Zadej platnou e-mailovou adresu' };
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithOtp({
@@ -39,7 +39,7 @@ export async function sendOtpCode(email: string): Promise<AuthActionResult> {
     },
   });
 
-  if (error) return { error: 'Could not send verification code' };
+  if (error) return { error: 'Ověřovací kód se nepodařilo poslat' };
   return { ok: true };
 }
 
@@ -49,12 +49,12 @@ export async function verifyOtpCode(
   next = '/',
 ): Promise<VerifyOtpResult> {
   const parsedEmail = parseEmail(email);
-  if (!parsedEmail) return { error: 'Enter a valid email address' };
+  if (!parsedEmail) return { error: 'Zadej platnou e-mailovou adresu' };
 
   const parsedToken = otpSchema.safeParse(token);
   if (!parsedToken.success) {
     return {
-      error: parsedToken.error.issues[0]?.message ?? 'Enter the verification code',
+      error: parsedToken.error.issues[0]?.message ?? 'Zadej ověřovací kód',
     };
   }
 
@@ -65,7 +65,7 @@ export async function verifyOtpCode(
     type: 'email',
   });
 
-  if (error) return { error: 'Invalid or expired verification code' };
+  if (error) return { error: 'Ověřovací kód je neplatný nebo vypršel' };
 
   return {
     ok: true,
