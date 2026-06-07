@@ -51,16 +51,20 @@ export function ActiveTrekHero({
         aria-label={`Open ${trail.name}`}
         className="absolute inset-0 z-10"
       />
-      {/* Background — cover photo or difficulty gradient */}
-      {trail.cover_image_url ? (
+      {/* Difficulty gradient is the base; the cover photo overlays it when it
+          loads, and hides itself if it can't (e.g. offline) so we never show a
+          broken image. */}
+      <div className="absolute inset-0" style={{ background: gradient }} />
+      {trail.cover_image_url && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={trail.cover_image_url}
           alt=""
           className="absolute inset-0 h-full w-full object-cover"
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }}
         />
-      ) : (
-        <div className="absolute inset-0" style={{ background: gradient }} />
       )}
       {/* Legibility scrim */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-black/20" />

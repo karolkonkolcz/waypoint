@@ -181,12 +181,18 @@ function TrailCard({ trail, stages }: { trail: TrailRow; stages: number }) {
       href={`/trails/${trail.id}`}
       className="flex items-center gap-3 rounded-2xl border bg-card p-3 shadow-sm transition-colors hover:bg-accent active:scale-[0.99]"
     >
-      <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted">
-        {trail.cover_image_url ? (
+      <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted">
+        <MountainIcon className="h-6 w-6 text-muted-foreground" />
+        {trail.cover_image_url && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={trail.cover_image_url} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <MountainIcon className="h-6 w-6 text-muted-foreground" />
+          <img
+            src={trail.cover_image_url}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+          />
         )}
       </div>
       <div className="min-w-0 flex-1">

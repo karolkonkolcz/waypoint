@@ -14,9 +14,13 @@ import {
   Trash2Icon,
   ArrowRightLeftIcon,
   FootprintsIcon,
+  ImagePlusIcon,
+  Loader2Icon,
+  XIcon,
 } from 'lucide-react';
 import { trailRepo } from '@/lib/db/repositories/trail.repo';
 import { stageRepo } from '@/lib/db/repositories/stage.repo';
+import { uploadTrailCover } from '@/lib/storage/covers';
 import { DifficultyBadge } from '@/components/difficulty/DifficultyBadge';
 import { AlertDialog } from '@/components/ui/alert-dialog';
 import type { DifficultyClass } from '@/lib/domain/difficulty';
@@ -24,7 +28,7 @@ import { naismithHours } from '@/lib/domain/eta';
 import { sortMilestones } from '@/components/stage/StageTimeline';
 import { stageDate, formatStageDate } from '@/lib/domain/stageDate';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { TrailRow, Milestone, StageType } from '@/lib/db/dexie';
 
 /** One-line summary of a transit day's timeline for the stage list. */
@@ -348,6 +352,26 @@ function EditTrailForm({
   const [pace, setPace] = useState<PaceKmh>(
     (PACE_PRESETS.find((p) => p.kmh === trail.default_pace_kmh)?.kmh ?? 4) as PaceKmh,
   );
+  const [coverUrl, setCoverUrl] = useState<string | null>(trail.cover_image_url);
+  const [uploading, setUploading] = useState(false);
+  const [coverError, setCoverError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function handleCoverPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file
+    if (!file) return;
+    setCoverError(null);
+    setUploading(true);
+    try {
+      const url = await uploadTrailCover(file, trail.user_id, trail.id);
+      setCoverUrl(url);
+    } catch (err) {
+      setCoverError(err instanceof Error ? err.message : 'Upload failed.');
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -358,6 +382,7 @@ function EditTrailForm({
       description: (fd.get('description') as string).trim() || null,
       start_date: (fd.get('start_date') as string) || null,
       default_pace_kmh: pace,
+      cover_image_url: coverUrl,
     });
     setPending(false);
     onDone();
@@ -366,6 +391,59 @@ function EditTrailForm({
   return (
     <form onSubmit={handleSubmit} className="mb-6 space-y-4 rounded-2xl border bg-card p-4">
       <h2 className="font-semibold">Edit Trail</h2>
+
+      {/* Cover photo */}
+      <div className="space-y-1.5">
+        <label className="text-xs text-muted-foreground">Cover photo</label>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          onChange={handleCoverPick}
+          className="hidden"
+        />
+        {coverUrl ? (
+          <div className="relative overflow-hidden rounded-xl border">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={coverUrl} alt="Trail cover" className="h-32 w-full object-cover" />
+            <div className="absolute right-2 top-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                className="rounded-full bg-card/85 px-2.5 py-1 text-xs font-semibold backdrop-blur disabled:opacity-50"
+              >
+                Change
+              </button>
+              <button
+                type="button"
+                onClick={() => setCoverUrl(null)}
+                aria-label="Remove cover"
+                className="flex h-6 w-6 items-center justify-center rounded-full bg-card/85 backdrop-blur"
+              >
+                <XIcon className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className="flex h-24 w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed text-sm text-muted-foreground hover:border-primary hover:text-foreground disabled:opacity-50"
+          >
+            {uploading ? (
+              <Loader2Icon className="h-5 w-5 animate-spin" />
+            ) : (
+              <>
+                <ImagePlusIcon className="h-5 w-5" />
+                Add cover photo
+              </>
+            )}
+          </button>
+        )}
+        {coverError && <p className="text-xs text-destructive">{coverError}</p>}
+      </div>
 
       <div className="space-y-1.5">
         <label className="text-xs text-muted-foreground">Trail name</label>
