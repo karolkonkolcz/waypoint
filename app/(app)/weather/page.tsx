@@ -116,7 +116,7 @@ export default function WeatherPage() {
         <div className="flex items-baseline justify-between gap-2">
           <h1 className="text-2xl font-bold">Weather</h1>
           {mode.kind === 'online' && currentTemp(mode.forecast) !== null && (
-            <span className="text-2xl font-semibold tabular-nums text-muted-foreground">
+            <span className="text-4xl font-bold tabular-nums leading-none text-foreground">
               {currentTemp(mode.forecast)}°
             </span>
           )}

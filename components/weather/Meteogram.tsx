@@ -93,12 +93,12 @@ function buildPanels(data: MeteogramData): PanelBuilder[] {
         const seriesData: (number | null)[][] = [x];
         if (hasBand) {
           series.push(
-            { scale: 't', stroke: 'transparent', fill: 'rgba(239,108,0,0.12)', points: { show: false } },
+            { scale: 't', stroke: 'transparent', fill: 'rgba(243,112,19,0.14)', points: { show: false } },
             { scale: 't', stroke: 'transparent', points: { show: false } },
           );
           seriesData.push(data.tempMax!, data.tempMin!);
         }
-        series.push({ scale: 't', label: 'temp', stroke: '#ef6c00', width: 2, points: { show: false } });
+        series.push({ scale: 't', label: 'temp', stroke: '#f37013', width: 2, points: { show: false } });
         seriesData.push(data.temperature!);
         return new uPlot(
           {
@@ -239,7 +239,7 @@ function buildPanels(data: MeteogramData): PanelBuilder[] {
             ],
             series: [
               {},
-              { scale: 'd', label: 'dir', stroke: '#5d4037', paths: () => null, points: { show: true, size: 4 } },
+              { scale: 'd', label: 'dir', stroke: '#f37013', paths: () => null, points: { show: true, size: 4 } },
             ],
           } as uPlot.Options,
           [x, data.windDir!] as uPlot.AlignedData,
