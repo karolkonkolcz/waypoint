@@ -1,6 +1,13 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+const PUBLIC_PATHS = ['/welcome', '/login', '/auth/confirm'];
+const GUEST_ONLY_PATHS = ['/welcome', '/login'];
+
+function matchesPath(pathname: string, paths: string[]) {
+  return paths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+}
+
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -31,14 +38,16 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
+  const isPublicPath = matchesPath(pathname, PUBLIC_PATHS);
+  const isGuestOnlyPath = matchesPath(pathname, GUEST_ONLY_PATHS);
 
-  if (!user && pathname !== '/login') {
+  if (!user && !isPublicPath) {
     const url = request.nextUrl.clone();
-    url.pathname = '/login';
+    url.pathname = '/welcome';
     return NextResponse.redirect(url);
   }
 
-  if (user && pathname === '/login') {
+  if (user && isGuestOnlyPath) {
     const url = request.nextUrl.clone();
     url.pathname = '/';
     return NextResponse.redirect(url);
