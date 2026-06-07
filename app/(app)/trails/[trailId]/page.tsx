@@ -119,8 +119,12 @@ export default function TrailPage() {
         />
       )}
 
+      {!editing && trail.cover_image_url && (
+        <TrailHeroPhoto trail={trail} stageCount={stages.length} />
+      )}
+
       {/* Description */}
-      {!editing && trail.description && (
+      {!editing && !trail.cover_image_url && trail.description && (
         <p className="mb-5 text-sm text-muted-foreground leading-relaxed">{trail.description}</p>
       )}
 
@@ -218,6 +222,50 @@ export default function TrailPage() {
         onCancel={() => setDeleteOpen(false)}
       />
     </div>
+  );
+}
+
+function TrailHeroPhoto({ trail, stageCount }: { trail: TrailRow; stageCount: number }) {
+  return (
+    <section
+      className="relative mb-5 overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#2f373d_0%,#15191c_100%)] shadow-sm"
+      aria-label={`${trail.name} cover photo`}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={trail.cover_image_url ?? ''}
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover"
+        onError={(e) => {
+          e.currentTarget.style.display = 'none';
+        }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
+
+      <div className="relative flex min-h-[190px] flex-col justify-between gap-8 p-4 text-white">
+        <div className="flex items-start justify-between gap-3">
+          <span className="rounded-full bg-white/15 px-3 py-1 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-white/85 backdrop-blur">
+            Trail
+          </span>
+          {stageCount > 0 && (
+            <span className="rounded-full bg-black/30 px-3 py-1 text-xs font-semibold text-white/90 backdrop-blur">
+              {stageCount} {stageCount === 1 ? 'stage' : 'stages'}
+            </span>
+          )}
+        </div>
+
+        <div className="max-w-[90%]">
+          <h2 className="text-3xl font-extrabold leading-tight drop-shadow-sm">
+            {trail.name}
+          </h2>
+          {trail.description && (
+            <p className="mt-2 line-clamp-2 text-sm font-medium leading-snug text-white/85">
+              {trail.description}
+            </p>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -364,7 +412,7 @@ function EditTrailForm({
     setCoverError(null);
     setUploading(true);
     try {
-      const url = await uploadTrailCover(file, trail.user_id, trail.id);
+      const url = await uploadTrailCover(file, trail.id);
       setCoverUrl(url);
     } catch (err) {
       setCoverError(err instanceof Error ? err.message : 'Upload failed.');

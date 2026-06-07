@@ -58,12 +58,11 @@ async function toWebp(file: File): Promise<Encoded> {
  * Upload a trail cover photo to Supabase Storage and return its public URL.
  * The image is resized + converted to WebP in the browser first. Path:
  * {userId}/{trailId}-{timestamp}.{ext} — the leading folder is the owner so
- * storage RLS can scope writes (migration 0009). The timestamp makes each
+ * storage RLS can scope writes. The timestamp makes each
  * upload a fresh URL, sidestepping CDN caching of a replaced image.
  */
 export async function uploadTrailCover(
   file: File,
-  userId: string,
   trailId: string,
 ): Promise<string> {
   if (!file.type.startsWith('image/')) {
@@ -76,12 +75,17 @@ export async function uploadTrailCover(
   const { blob, ext, type } = await toWebp(file);
 
   const supabase = createClient();
-  const path = `${userId}/${trailId}-${Date.now()}.${ext}`;
+  const { data, error: authError } = await supabase.auth.getUser();
+  if (authError || !data.user) {
+    throw new Error('Sign in before uploading a cover photo.');
+  }
+
+  const path = `${data.user.id}/${trailId}-${Date.now()}.${ext}`;
 
   const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
     cacheControl: '3600',
     contentType: type,
-    upsert: true,
+    upsert: false,
   });
   if (error) throw error;
 
