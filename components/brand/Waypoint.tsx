@@ -39,15 +39,17 @@ export function WaypointMark({
 export function WaypointLockup({
   markSize = 30,
   className,
+  wordmarkClassName,
 }: {
   markSize?: number;
   className?: string;
+  wordmarkClassName?: string;
 }) {
   return (
     <span className={`inline-flex items-center gap-[3px] ${className ?? ''}`}>
       <WaypointMark size={markSize} />
       <span
-        className="font-sans text-[17px] font-black text-[#2F373D]"
+        className={`font-sans text-[17px] font-black text-[#2F373D] ${wordmarkClassName ?? ''}`}
         style={{ letterSpacing: '-0.04em' }}
       >
         WAYPOINT

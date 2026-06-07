@@ -1,12 +1,33 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { LogOutIcon, UserIcon, ChevronRightIcon } from 'lucide-react';
+import { LogOutIcon, UserIcon, ChevronRightIcon, ShieldIcon } from 'lucide-react';
 
 export default function SettingsPage() {
   const router = useRouter();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAdminStatus() {
+      try {
+        const { data } = await createClient().rpc('is_admin');
+        if (!cancelled) setIsAdmin(Boolean(data));
+      } catch {
+        if (!cancelled) setIsAdmin(false);
+      }
+    }
+
+    void loadAdminStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleSignOut() {
     await createClient().auth.signOut();
@@ -26,6 +47,17 @@ export default function SettingsPage() {
           Account
           <ChevronRightIcon className="ml-auto h-4 w-4 text-muted-foreground" />
         </Link>
+
+        {isAdmin && (
+          <Link
+            href="/admin/welcome-photos"
+            className="flex w-full items-center gap-3 rounded-2xl border bg-card px-4 py-3 text-sm font-medium hover:bg-muted"
+          >
+            <ShieldIcon className="h-4 w-4" />
+            Welcome photos
+            <ChevronRightIcon className="ml-auto h-4 w-4 text-muted-foreground" />
+          </Link>
+        )}
 
         <button
           onClick={handleSignOut}
