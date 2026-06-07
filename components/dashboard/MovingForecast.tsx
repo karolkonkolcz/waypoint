@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CloudRainIcon, MapPinIcon, FlagIcon } from 'lucide-react';
+import { CloudRainIcon, MapPinIcon, FlagIcon, RouteIcon } from 'lucide-react';
 import type { WeatherSnapshot, WeatherCondition, ForecastPhase } from '@/lib/weather/forecast';
 import { CONDITION_ICON } from '@/components/weather/conditionIcon';
 import { selectVisibleSlots } from '@/lib/weather/visibleSlots';
+import { Eyebrow } from '@/components/ui/primitives';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -95,10 +96,16 @@ export function MovingForecast({ snapshot, loading }: Props) {
   return (
     <section className="rounded-2xl border bg-card p-3">
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Moving forecast
-        </h2>
-        {loading && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />}
+        <Eyebrow>Moving forecast</Eyebrow>
+        <div className="flex items-center gap-1.5">
+          {loading && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />}
+          {snapshot.moving && (
+            <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+              <RouteIcon className="h-3 w-3" />
+              route-aware
+            </span>
+          )}
+        </div>
       </div>
 
       {/* pt leaves room for the YOU label sitting above the track */}

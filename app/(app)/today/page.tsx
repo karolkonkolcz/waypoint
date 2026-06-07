@@ -33,6 +33,7 @@ import { StageHeader } from '@/components/stage/StageHeader';
 import { WeatherAlertBadge } from '@/components/weather/WeatherAlertBadge';
 import { MovingForecast } from '@/components/dashboard/MovingForecast';
 import { TodoList } from '@/components/dashboard/TodoList';
+import { Eyebrow } from '@/components/ui/primitives';
 
 // MapLibre is browser-only and heavy — code-split exactly as the stage screen.
 const MapView = dynamic(() => import('@/components/map/MapView').then((m) => m.MapView), {
@@ -308,22 +309,20 @@ export default function TodayPage() {
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/45 to-transparent" />
 
             {/* Greeting overlay */}
-            <span className="absolute left-2 top-2 rounded-lg bg-card/85 px-2.5 py-1 text-xl font-bold backdrop-blur">
+            <span className="absolute left-2 top-2 rounded-lg bg-card/85 px-2.5 py-1 text-base font-bold backdrop-blur">
               {getGreeting(new Date(), name)}
             </span>
 
             {/* Tap affordance — the hero opens today's stage on the map. */}
-            <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-card/85 px-2 py-1 text-[11px] font-medium backdrop-blur">
+            <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-card/85 px-2.5 py-1 text-[11px] font-semibold backdrop-blur">
               <MapIcon className="h-3 w-3" />
-              Open map
+              Map
             </span>
 
-            {/* Stat chips */}
-            <div className="absolute inset-x-2 bottom-2 flex gap-2">
-              <StatChip label="distance" value={`${todayStage.distance_km} km`} />
-              <StatChip label="ascent" value={`+${todayStage.ascent_m} m`} />
-              <StatChip label="ETA" value={eta} />
-            </div>
+            {/* Route name */}
+            <span className="absolute inset-x-3 bottom-2 truncate text-base font-bold text-white drop-shadow">
+              {todayStage.title}
+            </span>
           </Link>
 
           {/* Static credit — the decorative hero drops MapLibre's interactive control. */}
@@ -332,6 +331,13 @@ export default function TodayPage() {
               © MapTiler © OpenStreetMap
             </p>
           )}
+
+          {/* Stat tiles — distance / ascent / ETA */}
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            <StatTileCard value={`${todayStage.distance_km} km`} label="Distance" />
+            <StatTileCard value={`+${todayStage.ascent_m} m`} label="Ascent" />
+            <StatTileCard value={eta} label="ETA" />
+          </div>
         </div>
       )}
 
@@ -347,15 +353,15 @@ export default function TodayPage() {
         <WeatherAlertBadge alerts={cachedAlerts.alerts} stale={!alertsRepo.isFresh(cachedAlerts)} />
       )}
 
-      {/* Block 3 — One-line summary */}
-      <p className="rounded-2xl border bg-card p-3 text-base leading-snug">{summary}</p>
+      {/* Block 3 — One-line summary, with difficulty + times emphasised */}
+      <p className="rounded-2xl border bg-card p-3 text-base leading-snug">
+        {emphasizeSummary(summary)}
+      </p>
 
       {/* Block 3.5 — Stage notes (date-aware via todayStage) */}
       {todayStage.notes && (
         <section className="rounded-2xl border bg-card p-4">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Notes
-          </h2>
+          <Eyebrow className="mb-2 block">Notes</Eyebrow>
           <p className="whitespace-pre-wrap text-sm leading-relaxed">{todayStage.notes}</p>
         </section>
       )}
@@ -371,12 +377,29 @@ export default function TodayPage() {
   );
 }
 
-function StatChip({ label, value }: { label: string; value: string }) {
+function StatTileCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex-1 rounded-xl border bg-card/90 py-1.5 text-center backdrop-blur">
-      <p className="font-mono text-sm font-semibold tabular-nums leading-tight">{value}</p>
-      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+    <div className="rounded-xl border bg-card py-2 text-center shadow-sm">
+      <p className="font-mono text-sm font-semibold tabular-nums leading-tight text-foreground">
+        {value}
+      </p>
+      <Eyebrow className="mt-0.5 block">{label}</Eyebrow>
     </div>
+  );
+}
+
+// Bold the day's difficulty word + any HH:MM times so the briefing scans fast.
+const EMPHASIS_RE = /(\b\d{1,2}:\d{2}\b|\b(?:easy|moderate|hard|tough)\b)/gi;
+
+function emphasizeSummary(text: string): React.ReactNode[] {
+  return text.split(EMPHASIS_RE).map((part, i) =>
+    i % 2 === 1 ? (
+      <strong key={i} className="font-semibold text-foreground">
+        {part}
+      </strong>
+    ) : (
+      <span key={i}>{part}</span>
+    ),
   );
 }
 

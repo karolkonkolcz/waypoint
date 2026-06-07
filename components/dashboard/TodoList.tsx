@@ -5,6 +5,7 @@ import { ChevronDownIcon, PlusIcon, CheckIcon, Trash2Icon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { TodoRow } from '@/lib/db/dexie';
 import { todoRepo } from '@/lib/db/repositories/todo.repo';
+import { Eyebrow } from '@/components/ui/primitives';
 
 interface Props {
   trailId: string;
@@ -28,6 +29,7 @@ export function TodoList({ trailId, userId, todos, stageId }: Props) {
   }, [storageKey]);
 
   const remaining = todos.filter((t) => !t.done).length;
+  const done = todos.length - remaining;
 
   function toggleCollapsed() {
     setCollapsed((c) => {
@@ -57,15 +59,20 @@ export function TodoList({ trailId, userId, todos, stageId }: Props) {
         className="flex w-full items-center justify-between"
         aria-expanded={!collapsed}
       >
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          To-do · {remaining} left
-        </h2>
-        <ChevronDownIcon
-          className={cn(
-            'h-4 w-4 text-muted-foreground transition-transform',
-            collapsed && '-rotate-90',
+        <Eyebrow>Today&apos;s checklist</Eyebrow>
+        <span className="flex items-center gap-2">
+          {todos.length > 0 && (
+            <span className="font-mono text-xs font-semibold tabular-nums text-muted-foreground">
+              {done}/{todos.length}
+            </span>
           )}
-        />
+          <ChevronDownIcon
+            className={cn(
+              'h-4 w-4 text-muted-foreground transition-transform',
+              collapsed && '-rotate-90',
+            )}
+          />
+        </span>
       </button>
 
       {!collapsed && (
@@ -78,9 +85,9 @@ export function TodoList({ trailId, userId, todos, stageId }: Props) {
                     onClick={() => todoRepo.toggle(todo.id)}
                     aria-label={todo.done ? 'Mark as not done' : 'Mark as done'}
                     className={cn(
-                      'flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-colors',
+                      'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-colors',
                       todo.done
-                        ? 'border-primary bg-primary text-primary-foreground'
+                        ? 'border-[#1c7c43] bg-[#1c7c43] text-white'
                         : 'border-border hover:border-primary',
                     )}
                   >
