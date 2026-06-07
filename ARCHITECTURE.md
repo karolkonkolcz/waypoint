@@ -80,6 +80,7 @@ Each is binding for the MVP.
 | D12 | Hikers carry a mental checklist (resupply, book a hut, charge battery) that belongs to a day, not a route. | Add a synced **`todos`** table — lightweight reminders optionally pinned to a stage and/or date, surfaced on the Today dashboard. Same offline-first ownership/sync shape as other entities. See `0007`. |
 | D13 | The Home hero and trail cards look bare without imagery. | Trails carry an optional **`cover_image_url`**; images are resized + re-encoded to **WebP client-side** and uploaded to a public Supabase Storage bucket (`trail-covers`) scoped to the owner's folder by RLS. See `0008`, `0009`, `0011`. |
 | D14 | The public welcome screen needs curated photography that non-developers can manage. | Admin-managed **`welcome_photos`** + an **`admin_users`** table and `is_admin()` helper; public read of active photos, admin-only writes, backed by a `welcome-photos` storage bucket. See `0010`. |
+| D15 | Public storage buckets accepted any file type — an authenticated user could upload an SVG/HTML payload and serve it as a public URL on our domain. | Restrict both buckets to `{image/webp, image/jpeg, image/png}` and cap uploads at 10 MB **at the bucket level** (Storage API enforces it regardless of client). `SECURITY DEFINER` functions (`handle_new_user`, `set_updated_at`, `is_admin`) had EXECUTE granted to `anon` via `/rest/v1/rpc/*`; revoked. Child-table RLS `WITH CHECK` now also validates that `trail_id` belongs to the caller. HTTP security headers (CSP, HSTS, X-Frame-Options, …) added in `next.config.ts`. See `0012`, `0013`. |
 
 ---
 
@@ -368,10 +369,11 @@ create trigger t_welcome_photos before update on public.welcome_photos for each 
 > **Migrations on disk.** `0001_init`, `0002_rls`, `0004_route_per_stage`,
 > `0005_stage_type_timeline`, `0006_stage_date`, `0007_todos`,
 > `0008_trail_cover_image`, `0009_trail_covers_storage`, `0010_welcome_photos`,
-> `0011_fix_trail_cover_storage_policies`. (`0003` was an early
-> profile-on-signup trigger that is no longer used — the app now creates the
-> `profiles` row in `lib/auth/post-auth.ts` after first sign-in, so it is not
-> on disk.)
+> `0011_fix_trail_cover_storage_policies`, `0012_security_hardening`,
+> `0013_rls_parent_ownership`. (`0003` — the original profile-on-signup trigger
+> — was re-introduced and hardened in `0012`: `handle_new_user` is a live
+> trigger on `auth.users` (`on_auth_user_created`); `postAuthPath` also upserts
+> defensively, so both paths work independently.)
 
 ### 5.1 GPX import flow
 
@@ -464,6 +466,22 @@ only.
 - `trail-covers` — public read; owner-only write, scoped by the first path
   segment `{auth.uid()}/…` (`0009`, tightened in `0011`).
 - `welcome-photos` — public read; admin-only write via `is_admin()` (`0010`).
+
+Both buckets are restricted to `allowed_mime_types = {image/webp, image/jpeg,
+image/png}` and `file_size_limit = 10 MB` at the bucket level (`0012`).
+
+**Security hardening** (`0012`, `0013`, `next.config.ts`):
+
+| Layer | What was tightened |
+|---|---|
+| Storage buckets | `allowed_mime_types` + `file_size_limit` — blocks SVG/HTML payloads regardless of client |
+| Supabase functions | `EXECUTE` revoked from `anon` on all `SECURITY DEFINER` functions; `authenticated` retains it only on `is_admin()` (required for RLS policies); `search_path` pinned on all three |
+| RLS child tables | `WITH CHECK` on `routes/stages/waypoints/weather_cache/todos` also calls `_owns_trail(trail_id)` to block cross-user trail references |
+| HTTP headers | CSP (allow-list per real outbound hosts), `X-Frame-Options: DENY`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `Strict-Transport-Security` |
+| `/api/alerts` | In-memory fixed-window rate limit (60 req/min/IP) |
+| GPX import | 25 MB file cap before `file.text()` to prevent main-thread lockup |
+
+`is_admin()` callable by `authenticated` is intentional — it backs the welcome_photos and storage RLS policies. The Supabase advisor flags it but revoking would break the admin section.
 
 ---
 

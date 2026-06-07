@@ -12,6 +12,10 @@ interface Props {
 
 type Status = 'idle' | 'preview' | 'error';
 
+// Guard against a huge file locking up the tab (text() + regex parse runs on the
+// main thread). A real multi-day GPX is a few MB; 25 MB is a generous ceiling.
+const MAX_GPX_BYTES = 25 * 1024 * 1024;
+
 function dayLabel(count: number): string {
   if (count === 1) return 'den';
   if (count >= 2 && count <= 4) return 'dny';
@@ -30,6 +34,11 @@ export function GpxImportZone({ userId }: Props) {
 
   async function handleFile(file: File) {
     setError('');
+    if (file.size > MAX_GPX_BYTES) {
+      setError('Soubor GPX je příliš velký (max. 25 MB).');
+      setStatus('error');
+      return;
+    }
     try {
       const text = await file.text();
       const p = buildTrekPreview(text, file.name);

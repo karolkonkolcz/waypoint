@@ -6,7 +6,40 @@ import { parseMeteoalarmFeed, slugFromLatLon } from '@/lib/alerts/meteoalarm';
 // resolve the country, fetch the CAP JSON server-side, and return normalized
 // alerts. Any failure degrades to an empty list — the UI just shows nothing.
 
+// Lightweight in-memory fixed-window rate limit (audit L3). Keyed by client IP.
+// On serverless this is per-instance and resets on cold start, which is fine —
+// it only needs to blunt bursts against a cheap, 30-min-cached upstream feed.
+const RATE_LIMIT = 60; // requests
+const WINDOW_MS = 60_000; // per minute
+const hits = new Map<string, { count: number; resetAt: number }>();
+
+function rateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = hits.get(ip);
+  if (!entry || now > entry.resetAt) {
+    hits.set(ip, { count: 1, resetAt: now + WINDOW_MS });
+    // Opportunistically evict stale buckets so the map can't grow unbounded.
+    if (hits.size > 10_000) {
+      for (const [key, value] of hits) if (now > value.resetAt) hits.delete(key);
+    }
+    return false;
+  }
+  entry.count += 1;
+  return entry.count > RATE_LIMIT;
+}
+
 export async function GET(request: Request) {
+  const ip =
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    'unknown';
+  if (rateLimited(ip)) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': '60' } },
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const lat = Number(searchParams.get('lat'));
   const lon = Number(searchParams.get('lon'));

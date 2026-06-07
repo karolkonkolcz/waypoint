@@ -24,9 +24,9 @@ export async function ensureSignedInProfile(): Promise<SaveProfileResult> {
 }
 
 /**
- * Upsert the signed-in user's profile name. There is no auto-insert trigger on
- * auth.users (see 0001_init.sql), so the profiles row may not exist yet — we
- * upsert id + email together with the chosen display name.
+ * Upsert the signed-in user's profile name. The handle_new_user trigger
+ * normally seeds the profiles row on signup (see 0012_security_hardening.sql),
+ * but we upsert id + email defensively in case it doesn't exist yet.
  */
 export async function saveDisplayName(name: string): Promise<SaveProfileResult> {
   const trimmed = name.trim();

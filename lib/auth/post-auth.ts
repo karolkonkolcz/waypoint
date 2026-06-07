@@ -2,9 +2,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/supabase/types';
 
 /**
- * First-time users have no profiles row yet, since there is no auto-insert
- * trigger on auth.users. Create the durable profile shell immediately, then
- * send them through onboarding before the requested destination.
+ * The handle_new_user trigger on auth.users creates the profiles row on signup
+ * (see 0012_security_hardening.sql), but we also upsert here so the flow stays
+ * resilient if that trigger is ever absent. First-time users (no row found) are
+ * routed through onboarding before the requested destination.
  */
 export async function postAuthPath(
   supabase: SupabaseClient<Database>,
