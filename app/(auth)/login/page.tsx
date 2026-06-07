@@ -8,7 +8,7 @@ export default async function LoginPage({ searchParams }: Props) {
   const { message, error, next } = await searchParams;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background p-6">
+    <main className="min-h-dvh overflow-hidden bg-[#f7f7f5] text-foreground">
       <OtpLoginForm
         initialMessage={message ? decodeURIComponent(message) : undefined}
         initialError={error ? decodeURIComponent(error) : undefined}
