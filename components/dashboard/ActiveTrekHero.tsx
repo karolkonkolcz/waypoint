@@ -26,24 +26,31 @@ export function ActiveTrekHero({
   dayNumber,
   totalDays,
   difficultyClass,
-  href,
+  trailHref,
+  todayHref,
 }: {
   trail: TrailRow;
   /** 1-based index of today's stage within the trek, or null if not started. */
   dayNumber: number | null;
   totalDays: number;
   difficultyClass: DifficultyClass | null;
-  href: string;
+  /** Tapping the card opens the trek's day-by-day detail. */
+  trailHref: string;
+  /** The "Today" button jumps to the dashboard for today's stage. */
+  todayHref: string;
 }) {
   const gradient =
     DIFFICULTY_GRADIENT[difficultyClass ?? 'default'] ?? DIFFICULTY_GRADIENT.default;
   const progress = dayNumber && totalDays > 0 ? dayNumber / totalDays : 0;
 
   return (
-    <Link
-      href={href}
-      className="relative block overflow-hidden rounded-2xl shadow-sm active:scale-[0.99]"
-    >
+    <div className="relative overflow-hidden rounded-2xl shadow-sm">
+      {/* Stretched link — the whole card opens the trek detail (all days). */}
+      <Link
+        href={trailHref}
+        aria-label={`Open ${trail.name}`}
+        className="absolute inset-0 z-10"
+      />
       {/* Background — cover photo or difficulty gradient */}
       {trail.cover_image_url ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -87,10 +94,13 @@ export function ActiveTrekHero({
                 </>
               )}
             </span>
-            <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--wp-orange)] px-3 py-1.5 text-sm font-semibold shadow-md">
+            <Link
+              href={todayHref}
+              className="relative z-20 inline-flex items-center gap-0.5 rounded-full bg-[var(--wp-orange)] px-3 py-1.5 text-sm font-semibold text-white shadow-md active:scale-95"
+            >
               Today
               <ChevronRightIcon className="h-4 w-4" />
-            </span>
+            </Link>
           </div>
         </div>
       </div>
@@ -101,6 +111,6 @@ export function ActiveTrekHero({
         className="absolute inset-x-0 bottom-0 h-1.5 rounded-none bg-black/30"
         fillClassName="rounded-none"
       />
-    </Link>
+    </div>
   );
 }

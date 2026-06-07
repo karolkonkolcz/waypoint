@@ -132,7 +132,8 @@ export default function HomePage() {
                 dayNumber={heroMeta.dayNumber}
                 totalDays={heroMeta.totalDays}
                 difficultyClass={heroMeta.difficulty}
-                href="/today"
+                trailHref={`/trails/${activeTrail.id}`}
+                todayHref="/today"
               />
             </div>
           )}
