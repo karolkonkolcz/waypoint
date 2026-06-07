@@ -84,7 +84,7 @@ export function TabBar() {
                 background: on ? 'var(--wp-orange)' : 'transparent',
                 color: on ? '#fff' : 'rgba(255,255,255,0.6)',
                 boxShadow: on
-                  ? '0 5px 14px -3px rgba(243,112,19,0.7)'
+                  ? '0 2px 10px -4px rgba(243,112,19,0.55)'
                   : 'none',
               }}
             >
