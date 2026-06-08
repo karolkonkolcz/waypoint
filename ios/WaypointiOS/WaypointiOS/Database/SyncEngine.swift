@@ -4,8 +4,8 @@ import GRDB
 import Network
 import UIKit
 
-// Pull-only sync engine (Phase 2). UI reads from GRDB; Supabase only refreshes
-// the local mirror. Push and conflict-producing local writes arrive in Phase 3.
+// Local-first sync engine. UI reads from GRDB; writes enqueue local ops; sync
+// pushes pending ops first, then pulls remote LWW changes.
 
 @MainActor
 final class SyncEngine {
@@ -19,12 +19,21 @@ final class SyncEngine {
 
     // Call once from app entry point.
     func start() {
-        Task { await pull() }
+        Task { await sync() }
         startForegroundObserver()
         startNetworkMonitor()
     }
 
     // Exposed for pull-to-refresh from ViewModels.
+    func sync() async {
+        do {
+            try await push()
+        } catch {
+            // Non-fatal: queued writes remain in GRDB for the next sync.
+        }
+        await pull()
+    }
+
     func pull() async {
         guard let session = supabase.auth.currentSession else { return }
         let userId = session.user.id.uuidString
@@ -37,6 +46,272 @@ final class SyncEngine {
         } catch {
             // Non-fatal: UI continues to render the local GRDB cache.
         }
+    }
+
+    // MARK: - Push
+
+    private func push() async throws {
+        let ops = try await fetchPendingOps()
+        guard !ops.isEmpty else { return }
+
+        for op in ops {
+            switch op.entity {
+            case Trail.databaseTableName:
+                try await pushTrail(op)
+            case Stage.databaseTableName:
+                try await pushStage(op)
+            case Route.databaseTableName:
+                try await pushRoute(op)
+            case Waypoint.databaseTableName:
+                try await pushWaypoint(op)
+            case Todo.databaseTableName:
+                try await pushTodo(op)
+            default:
+                try await deleteQueueOp(op)
+            }
+        }
+    }
+
+    private func pushTrail(_ op: SyncQueueOp) async throws {
+        guard let row = try await fetchTrail(id: op.rowId) else {
+            try await deleteQueueOp(op)
+            return
+        }
+        let payload = TrailPayload(row, deletedAt: deletedAt(for: row.deletedAt, op: op))
+        try await supabase.from(Trail.databaseTableName).upsert(payload, onConflict: "id").execute()
+        try await finishPushedOp(op)
+    }
+
+    private func pushStage(_ op: SyncQueueOp) async throws {
+        guard let row = try await fetchStage(id: op.rowId) else {
+            try await deleteQueueOp(op)
+            return
+        }
+        let payload = StagePayload(row, deletedAt: deletedAt(for: row.deletedAt, op: op))
+        try await supabase.from(Stage.databaseTableName).upsert(payload, onConflict: "id").execute()
+        try await finishPushedOp(op)
+    }
+
+    private func pushRoute(_ op: SyncQueueOp) async throws {
+        guard let row = try await fetchRoute(id: op.rowId) else {
+            try await deleteQueueOp(op)
+            return
+        }
+        let payload = RoutePayload(row, deletedAt: deletedAt(for: row.deletedAt, op: op))
+        try await supabase.from(Route.databaseTableName).upsert(payload, onConflict: "id").execute()
+        try await finishPushedOp(op)
+    }
+
+    private func pushWaypoint(_ op: SyncQueueOp) async throws {
+        guard let row = try await fetchWaypoint(id: op.rowId) else {
+            try await deleteQueueOp(op)
+            return
+        }
+        let payload = WaypointPayload(row, deletedAt: deletedAt(for: row.deletedAt, op: op))
+        try await supabase.from(Waypoint.databaseTableName).upsert(payload, onConflict: "id").execute()
+        try await finishPushedOp(op)
+    }
+
+    private func pushTodo(_ op: SyncQueueOp) async throws {
+        guard let row = try await fetchTodo(id: op.rowId) else {
+            try await deleteQueueOp(op)
+            return
+        }
+        let payload = TodoPayload(row, deletedAt: deletedAt(for: row.deletedAt, op: op))
+        try await supabase.from(Todo.databaseTableName).upsert(payload, onConflict: "id").execute()
+        try await finishPushedOp(op)
+    }
+
+    private func deletedAt(for rowDeletedAt: Date?, op: SyncQueueOp) -> Date? {
+        rowDeletedAt ?? (op.op == .delete ? Date() : nil)
+    }
+
+    private func finishPushedOp(_ op: SyncQueueOp) async throws {
+        try await db.dbPool.write { db in
+            if let seq = op.seq {
+                try db.execute(sql: "DELETE FROM sync_queue WHERE seq = ?", arguments: [seq])
+            }
+            let remaining = try Int.fetchOne(
+                db,
+                sql: "SELECT COUNT(*) FROM sync_queue WHERE entity = ? AND row_id = ?",
+                arguments: [op.entity, op.rowId]
+            ) ?? 0
+            if remaining == 0 {
+                try db.execute(sql: "UPDATE \(op.entity) SET _dirty = 0 WHERE id = ?", arguments: [op.rowId])
+            }
+        }
+    }
+
+    private func deleteQueueOp(_ op: SyncQueueOp) async throws {
+        guard let seq = op.seq else { return }
+        try await db.dbPool.write { db in
+            try db.execute(sql: "DELETE FROM sync_queue WHERE seq = ?", arguments: [seq])
+        }
+    }
+
+    private func fetchPendingOps() async throws -> [SyncQueueOp] {
+        let rows = try await db.dbPool.read { db in
+            try Row.fetchAll(
+                db,
+                sql: "SELECT seq, entity, op, row_id, created_at FROM sync_queue ORDER BY seq ASC"
+            )
+        }
+        return rows.map(makeSyncQueueOp)
+    }
+
+    private func fetchTrail(id: String) async throws -> Trail? {
+        let row = try await fetchOne(table: Trail.databaseTableName, id: id)
+        return row.map(makeTrail)
+    }
+
+    private func fetchStage(id: String) async throws -> Stage? {
+        let row = try await fetchOne(table: Stage.databaseTableName, id: id)
+        return row.map(makeStage)
+    }
+
+    private func fetchRoute(id: String) async throws -> Route? {
+        let row = try await fetchOne(table: Route.databaseTableName, id: id)
+        return row.map(makeRoute)
+    }
+
+    private func fetchWaypoint(id: String) async throws -> Waypoint? {
+        let row = try await fetchOne(table: Waypoint.databaseTableName, id: id)
+        return row.map(makeWaypoint)
+    }
+
+    private func fetchTodo(id: String) async throws -> Todo? {
+        let row = try await fetchOne(table: Todo.databaseTableName, id: id)
+        return row.map(makeTodo)
+    }
+
+    private func fetchOne(table: String, id: String) async throws -> Row? {
+        try await db.dbPool.read { db in
+            try Row.fetchOne(db, sql: "SELECT * FROM \(table) WHERE id = ?", arguments: [id])
+        }
+    }
+
+    private func makeSyncQueueOp(_ row: Row) -> SyncQueueOp {
+        SyncQueueOp(
+            seq: row["seq"],
+            entity: row["entity"],
+            op: SyncOperation(rawValue: row["op"]) ?? .upsert,
+            rowId: row["row_id"],
+            createdAt: row["created_at"]
+        )
+    }
+
+    private func makeTrail(_ row: Row) -> Trail {
+        Trail(
+            id: row["id"],
+            userId: row["user_id"],
+            name: row["name"],
+            description: row["description"],
+            startDate: row["start_date"],
+            defaultPaceKmh: row["default_pace_kmh"],
+            preferences: row["preferences"],
+            coverImageUrl: row["cover_image_url"],
+            createdAt: rowDate(row, "created_at"),
+            updatedAt: rowDate(row, "updated_at"),
+            deletedAt: rowOptionalDate(row, "deleted_at"),
+            dirty: rowBool(row, "_dirty")
+        )
+    }
+
+    private func makeStage(_ row: Row) -> Stage {
+        Stage(
+            id: row["id"],
+            trailId: row["trail_id"],
+            userId: row["user_id"],
+            title: row["title"],
+            orderIndex: row["order_index"],
+            stageType: row["stage_type"],
+            distanceKm: row["distance_km"],
+            ascentM: row["ascent_m"],
+            descentM: row["descent_m"],
+            difficultyScore: row["difficulty_score"],
+            difficultyClass: row["difficulty_class"],
+            date: row["date"],
+            startDistanceKm: row["start_distance_km"],
+            endDistanceKm: row["end_distance_km"],
+            locationName: row["location_name"],
+            locationLat: row["location_lat"],
+            locationLon: row["location_lon"],
+            notes: row["notes"],
+            timeline: row["timeline"],
+            createdAt: rowDate(row, "created_at"),
+            updatedAt: rowDate(row, "updated_at"),
+            deletedAt: rowOptionalDate(row, "deleted_at"),
+            dirty: rowBool(row, "_dirty")
+        )
+    }
+
+    private func makeRoute(_ row: Row) -> Route {
+        Route(
+            id: row["id"],
+            trailId: row["trail_id"],
+            stageId: row["stage_id"],
+            userId: row["user_id"],
+            geojson: row["geojson"],
+            totalDistanceKm: row["total_distance_km"],
+            totalAscentM: row["total_ascent_m"],
+            totalDescentM: row["total_descent_m"],
+            elevationProfile: row["elevation_profile"],
+            source: row["source"],
+            createdAt: rowDate(row, "created_at"),
+            updatedAt: rowDate(row, "updated_at"),
+            deletedAt: rowOptionalDate(row, "deleted_at"),
+            dirty: rowBool(row, "_dirty")
+        )
+    }
+
+    private func makeWaypoint(_ row: Row) -> Waypoint {
+        Waypoint(
+            id: row["id"],
+            trailId: row["trail_id"],
+            userId: row["user_id"],
+            name: row["name"],
+            type: row["type"],
+            latitude: row["latitude"],
+            longitude: row["longitude"],
+            elevationM: row["elevation_m"],
+            distanceAlongRouteKm: row["distance_along_route_km"],
+            description: row["description"],
+            createdAt: rowDate(row, "created_at"),
+            updatedAt: rowDate(row, "updated_at"),
+            deletedAt: rowOptionalDate(row, "deleted_at"),
+            dirty: rowBool(row, "_dirty")
+        )
+    }
+
+    private func makeTodo(_ row: Row) -> Todo {
+        Todo(
+            id: row["id"],
+            userId: row["user_id"],
+            trailId: row["trail_id"],
+            stageId: row["stage_id"],
+            date: row["date"],
+            text: row["text"],
+            done: rowBool(row, "done"),
+            orderIndex: row["order_index"],
+            createdAt: rowDate(row, "created_at"),
+            updatedAt: rowDate(row, "updated_at"),
+            deletedAt: rowOptionalDate(row, "deleted_at"),
+            dirty: rowBool(row, "_dirty")
+        )
+    }
+
+    private func rowDate(_ row: Row, _ column: String) -> Date {
+        Date(timeIntervalSince1970: row[column])
+    }
+
+    private func rowOptionalDate(_ row: Row, _ column: String) -> Date? {
+        let timestamp: Double? = row[column]
+        return timestamp.map { Date(timeIntervalSince1970: $0) }
+    }
+
+    private func rowBool(_ row: Row, _ column: String) -> Bool {
+        let value: Int = row[column]
+        return value != 0
     }
 
     // MARK: - Pull
@@ -208,7 +483,7 @@ final class SyncEngine {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { await self?.pull() }
+            Task { await self?.sync() }
         }
     }
 
@@ -217,7 +492,7 @@ final class SyncEngine {
         networkMonitor = monitor
         monitor.pathUpdateHandler = { [weak self] path in
             guard path.status == .satisfied else { return }
-            Task { await self?.pull() }
+            Task { await self?.sync() }
         }
         monitor.start(queue: DispatchQueue(label: "waypoint.netmonitor", qos: .background))
     }
@@ -491,6 +766,176 @@ private struct RemoteTodo: Decodable, Sendable {
 
 // MARK: - JSON + Date helpers
 
+private struct TrailPayload: Encodable, Sendable {
+    let id: String
+    let user_id: String
+    let name: String
+    let description: String?
+    let start_date: String?
+    let default_pace_kmh: Double
+    let preferences: JSONValue
+    let cover_image_url: String?
+    let created_at: String
+    let updated_at: String
+    let deleted_at: String?
+
+    init(_ row: Trail, deletedAt: Date?) {
+        id = row.id
+        user_id = row.userId
+        name = row.name
+        description = row.description
+        start_date = row.startDate
+        default_pace_kmh = row.defaultPaceKmh
+        preferences = JSONValue(jsonString: row.preferences, fallback: .object([:]))
+        cover_image_url = row.coverImageUrl
+        created_at = nowIso(row.createdAt)
+        updated_at = nowIso(row.updatedAt)
+        deleted_at = deletedAt.map(nowIso)
+    }
+}
+
+private struct StagePayload: Encodable, Sendable {
+    let id: String
+    let trail_id: String
+    let user_id: String
+    let title: String
+    let order_index: Int
+    let stage_type: String
+    let distance_km: Double
+    let ascent_m: Double
+    let descent_m: Double
+    let difficulty_score: Int?
+    let difficulty_class: String?
+    let date: String?
+    let start_distance_km: Double?
+    let end_distance_km: Double?
+    let location_name: String?
+    let location_lat: Double?
+    let location_lon: Double?
+    let notes: String?
+    let timeline: JSONValue
+    let created_at: String
+    let updated_at: String
+    let deleted_at: String?
+
+    init(_ row: Stage, deletedAt: Date?) {
+        id = row.id
+        trail_id = row.trailId
+        user_id = row.userId
+        title = row.title
+        order_index = row.orderIndex
+        stage_type = row.stageType
+        distance_km = row.distanceKm
+        ascent_m = row.ascentM
+        descent_m = row.descentM
+        difficulty_score = row.difficultyScore
+        difficulty_class = row.difficultyClass
+        date = row.date
+        start_distance_km = row.startDistanceKm
+        end_distance_km = row.endDistanceKm
+        location_name = row.locationName
+        location_lat = row.locationLat
+        location_lon = row.locationLon
+        notes = row.notes
+        timeline = JSONValue(jsonString: row.timeline ?? "[]", fallback: .array([]))
+        created_at = nowIso(row.createdAt)
+        updated_at = nowIso(row.updatedAt)
+        deleted_at = deletedAt.map(nowIso)
+    }
+}
+
+private struct RoutePayload: Encodable, Sendable {
+    let id: String
+    let trail_id: String
+    let stage_id: String?
+    let user_id: String
+    let geojson: JSONValue
+    let total_distance_km: Double
+    let total_ascent_m: Int
+    let total_descent_m: Int
+    let elevation_profile: JSONValue
+    let source: String
+    let created_at: String
+    let updated_at: String
+    let deleted_at: String?
+
+    init(_ row: Route, deletedAt: Date?) {
+        id = row.id
+        trail_id = row.trailId
+        stage_id = row.stageId
+        user_id = row.userId
+        geojson = JSONValue(jsonString: row.geojson, fallback: .object([:]))
+        total_distance_km = row.totalDistanceKm
+        total_ascent_m = row.totalAscentM
+        total_descent_m = row.totalDescentM
+        elevation_profile = JSONValue(jsonString: row.elevationProfile, fallback: .array([]))
+        source = row.source
+        created_at = nowIso(row.createdAt)
+        updated_at = nowIso(row.updatedAt)
+        deleted_at = deletedAt.map(nowIso)
+    }
+}
+
+private struct WaypointPayload: Encodable, Sendable {
+    let id: String
+    let trail_id: String
+    let user_id: String
+    let name: String
+    let type: String
+    let latitude: Double
+    let longitude: Double
+    let elevation_m: Int?
+    let distance_along_route_km: Double?
+    let description: String?
+    let created_at: String
+    let updated_at: String
+    let deleted_at: String?
+
+    init(_ row: Waypoint, deletedAt: Date?) {
+        id = row.id
+        trail_id = row.trailId
+        user_id = row.userId
+        name = row.name
+        type = row.type
+        latitude = row.latitude
+        longitude = row.longitude
+        elevation_m = row.elevationM
+        distance_along_route_km = row.distanceAlongRouteKm
+        description = row.description
+        created_at = nowIso(row.createdAt)
+        updated_at = nowIso(row.updatedAt)
+        deleted_at = deletedAt.map(nowIso)
+    }
+}
+
+private struct TodoPayload: Encodable, Sendable {
+    let id: String
+    let user_id: String
+    let trail_id: String
+    let stage_id: String?
+    let date: String?
+    let text: String
+    let done: Bool
+    let order_index: Int
+    let created_at: String
+    let updated_at: String
+    let deleted_at: String?
+
+    init(_ row: Todo, deletedAt: Date?) {
+        id = row.id
+        user_id = row.userId
+        trail_id = row.trailId
+        stage_id = row.stageId
+        date = row.date
+        text = row.text
+        done = row.done
+        order_index = row.orderIndex
+        created_at = nowIso(row.createdAt)
+        updated_at = nowIso(row.updatedAt)
+        deleted_at = deletedAt.map(nowIso)
+    }
+}
+
 private enum JSONValue: Codable, Sendable {
     case object([String: JSONValue])
     case array([JSONValue])
@@ -498,6 +943,17 @@ private enum JSONValue: Codable, Sendable {
     case number(Double)
     case bool(Bool)
     case null
+
+    init(jsonString: String, fallback: JSONValue) {
+        guard
+            let data = jsonString.data(using: .utf8),
+            let decoded = try? JSONDecoder().decode(JSONValue.self, from: data)
+        else {
+            self = fallback
+            return
+        }
+        self = decoded
+    }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()

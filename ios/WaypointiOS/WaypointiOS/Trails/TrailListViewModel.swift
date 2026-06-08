@@ -20,11 +20,11 @@ final class TrailListViewModel {
     private var observationTask: Task<Void, Never>?
 
     // Called by .task { } and .refreshable { } in the view.
-    // First call starts the live observation; subsequent calls (e.g. pull-to-refresh)
-    // also trigger a Supabase pull so fresh data appears quickly.
+    // First call starts the live observation; subsequent calls also sync queued
+    // local writes and pull fresh Supabase data.
     func load() async {
         startObservationIfNeeded()
-        await SyncEngine.shared.pull()
+        await SyncEngine.shared.sync()
     }
 
     // MARK: - Private
@@ -35,12 +35,8 @@ final class TrailListViewModel {
 
         observationTask = Task { [weak self] in
             guard let self else { return }
-            do {
-                for try await trails in repo.observeAll() {
-                    self.state = .loaded(trails)
-                }
-            } catch {
-                self.state = .failed(error.localizedDescription)
+            for await trails in repo.observeAll() {
+                self.state = .loaded(trails)
             }
         }
     }

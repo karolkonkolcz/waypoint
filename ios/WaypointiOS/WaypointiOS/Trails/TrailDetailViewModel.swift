@@ -26,7 +26,7 @@ final class TrailDetailViewModel {
             currentTrailId = trailId
         }
         startObservationIfNeeded(trailId: trailId)
-        await SyncEngine.shared.pull()
+        await SyncEngine.shared.sync()
     }
 
     // MARK: - Private
@@ -37,12 +37,8 @@ final class TrailDetailViewModel {
 
         observationTask = Task { [weak self] in
             guard let self else { return }
-            do {
-                for try await stages in repo.observeByTrail(trailId: trailId) {
-                    self.state = .loaded(stages)
-                }
-            } catch {
-                self.state = .failed(error.localizedDescription)
+            for await stages in repo.observeByTrail(trailId: trailId) {
+                self.state = .loaded(stages)
             }
         }
     }

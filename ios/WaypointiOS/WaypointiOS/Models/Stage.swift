@@ -2,8 +2,8 @@ import Foundation
 import GRDB
 
 // GRDB record for stages. Mirrors Postgres schema snake_case columns exactly.
-// `timeline` (jsonb) is stored as raw JSON text; decoded from GRDB only,
-// never written from the Supabase DTO in Phase 2.
+// `timeline` (jsonb) is stored as raw JSON text so it can round-trip through
+// GRDB and Supabase without ad hoc field loss.
 
 struct Stage: Identifiable, Sendable {
     var id: String
