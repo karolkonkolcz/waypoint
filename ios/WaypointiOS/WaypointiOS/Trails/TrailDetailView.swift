@@ -10,13 +10,56 @@ import SwiftUI
 struct TrailDetailView: View {
     let trail: Trail
     @State private var model = TrailDetailViewModel()
+    @State private var showEditTrail = false
+    @State private var addingStage = false
+    @State private var editingStage: Stage?
+
+    private var stages: [Stage] {
+        if case .loaded(let stages) = model.state { return stages }
+        return []
+    }
 
     var body: some View {
         content
             .navigationTitle(trail.name)
             .navigationBarTitleDisplayMode(.large)
+            .toolbar { toolbar }
             .task { await model.load(trailId: trail.id) }
             .refreshable { await model.load(trailId: trail.id) }
+            .sheet(isPresented: $showEditTrail) {
+                TrailEditView(trail: trail)
+            }
+            .sheet(isPresented: $addingStage) {
+                StageEditView(trailId: trail.id, nextOrderIndex: stages.count)
+            }
+            .sheet(item: $editingStage) { stage in
+                StageEditView(trailId: trail.id, stage: stage)
+            }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbar: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            EditButton()
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            Menu {
+                Button { addingStage = true } label: {
+                    Label("Přidat etapu", systemImage: "plus")
+                }
+                Button { showEditTrail = true } label: {
+                    Label("Upravit trasu", systemImage: "pencil")
+                }
+                NavigationLink {
+                    TrailMapView(trail: trail, stages: stages)
+                } label: {
+                    Label("Mapa", systemImage: "map")
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .accessibilityLabel("Akce")
+        }
     }
 
     @ViewBuilder
@@ -25,13 +68,6 @@ struct TrailDetailView: View {
         case .idle, .loading:
             ProgressView("Načítám etapy…")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-        case .loaded(let stages) where stages.isEmpty:
-            ContentUnavailableView(
-                "Žádné etapy",
-                systemImage: "map.fill",
-                description: Text("Tato trasa zatím nemá etapy.")
-            )
 
         case .loaded(let stages):
             List {
@@ -42,23 +78,34 @@ struct TrailDetailView: View {
                     }
                 }
                 Section("Etapy (\(stages.count))") {
+                    if stages.isEmpty {
+                        Text("Tato trasa zatím nemá etapy. Přidej etapu nebo importuj GPX.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
                     ForEach(stages) { stage in
                         NavigationLink {
                             StageDetailView(stage: stage, trail: trail)
                         } label: {
                             StageRow(stage: stage, trail: trail)
                         }
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                model.deleteStage(stage)
+                            } label: {
+                                Label("Smazat", systemImage: "trash")
+                            }
+                            Button {
+                                editingStage = stage
+                            } label: {
+                                Label("Upravit", systemImage: "pencil")
+                            }
+                            .tint(.blue)
+                        }
                     }
-                }
-            }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink {
-                        TrailMapView(trail: trail, stages: stages)
-                    } label: {
-                        Image(systemName: "map")
+                    .onMove { source, destination in
+                        model.moveStages(stages, from: source, to: destination)
                     }
-                    .accessibilityLabel("Mapa")
                 }
             }
 

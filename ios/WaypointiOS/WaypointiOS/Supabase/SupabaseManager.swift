@@ -27,4 +27,10 @@ final class SupabaseManager {
             supabaseKey: SupabaseConfig.publishableKey
         )
     }
+
+    /// The signed-in user's id, lower-cased to match the row shape pulled from
+    /// Postgres. nil only if no session is active (should not happen past login).
+    var currentUserId: String? {
+        client.auth.currentSession?.user.id.uuidString.lowercased()
+    }
 }

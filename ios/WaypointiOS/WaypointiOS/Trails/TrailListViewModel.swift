@@ -27,6 +27,15 @@ final class TrailListViewModel {
         await SyncEngine.shared.sync()
     }
 
+    func delete(_ trail: Trail) {
+        do {
+            try repo.remove(id: trail.id)
+            Task { await SyncEngine.shared.sync() }
+        } catch {
+            state = .failed(error.localizedDescription)
+        }
+    }
+
     // MARK: - Private
 
     private func startObservationIfNeeded() {

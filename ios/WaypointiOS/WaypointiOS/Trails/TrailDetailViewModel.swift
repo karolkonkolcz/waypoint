@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // Reads stages for a trail from GRDB via ValueObservation.
 // load(trailId:) is idempotent — the observation runs once per view lifetime.
@@ -27,6 +28,27 @@ final class TrailDetailViewModel {
         }
         startObservationIfNeeded(trailId: trailId)
         await SyncEngine.shared.sync()
+    }
+
+    func deleteStage(_ stage: Stage) {
+        do {
+            try repo.remove(id: stage.id)
+            Task { await SyncEngine.shared.sync() }
+        } catch {
+            state = .failed(error.localizedDescription)
+        }
+    }
+
+    func moveStages(_ stages: [Stage], from source: IndexSet, to destination: Int) {
+        guard let trailId = currentTrailId else { return }
+        var reordered = stages
+        reordered.move(fromOffsets: source, toOffset: destination)
+        do {
+            try repo.reorder(trailId: trailId, orderedIds: reordered.map(\.id))
+            Task { await SyncEngine.shared.sync() }
+        } catch {
+            state = .failed(error.localizedDescription)
+        }
     }
 
     // MARK: - Private
