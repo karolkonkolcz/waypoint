@@ -18,10 +18,18 @@ final class WeatherTabViewModel: NSObject, CLLocationManagerDelegate {
 
     var state: State = .idle
 
+    enum LocationError: Error { case denied, timeout, unavailable }
+
     private let locationManager = CLLocationManager()
     private let client = OpenMeteoClient()
     private let weatherRepo = WeatherRepository()
     private var locationContinuation: CheckedContinuation<CLLocation, Error>?
+    private var timeoutTask: Task<Void, Never>?
+    /// True only while a `requestLocation()` call is waiting for the user to
+    /// answer the permission prompt. Guards the auth-change callback so the
+    /// system's init-time callback (fired when the delegate is set) can't kick
+    /// off a stray location request with no continuation attached.
+    private var awaitingAuthorization = false
 
     override init() {
         super.init()
@@ -75,24 +83,26 @@ final class WeatherTabViewModel: NSObject, CLLocationManagerDelegate {
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.first else { return }
-        Task { @MainActor in
-            locationContinuation?.resume(returning: location)
-            locationContinuation = nil
-        }
+        Task { @MainActor in self.finishLocation(.success(location)) }
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        Task { @MainActor in
-            locationContinuation?.resume(throwing: error)
-            locationContinuation = nil
-        }
+        Task { @MainActor in self.finishLocation(.failure(error)) }
     }
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         Task { @MainActor in
-            if manager.authorizationStatus == .authorizedWhenInUse ||
-                manager.authorizationStatus == .authorizedAlways {
+            // Only react while a request is actively waiting for the prompt;
+            // ignore the system's init-time callback.
+            guard self.awaitingAuthorization else { return }
+            switch manager.authorizationStatus {
+            case .authorizedWhenInUse, .authorizedAlways:
+                self.awaitingAuthorization = false
                 manager.requestLocation()
+            case .denied, .restricted:
+                self.finishLocation(.failure(LocationError.denied))
+            default:
+                break // still .notDetermined — keep waiting
             }
         }
     }
@@ -102,13 +112,31 @@ final class WeatherTabViewModel: NSObject, CLLocationManagerDelegate {
     private func requestLocation() async throws -> CLLocation {
         try await withCheckedThrowingContinuation { continuation in
             locationContinuation = continuation
-            let status = locationManager.authorizationStatus
-            if status == .notDetermined {
+
+            // Never hang forever: fall back if no fix arrives in time.
+            timeoutTask = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(12))
+                guard !Task.isCancelled else { return }
+                self.finishLocation(.failure(LocationError.timeout))
+            }
+
+            if locationManager.authorizationStatus == .notDetermined {
+                awaitingAuthorization = true
                 locationManager.requestWhenInUseAuthorization()
             } else {
                 locationManager.requestLocation()
             }
         }
+    }
+
+    /// Resumes the pending continuation exactly once and tears down the timeout.
+    private func finishLocation(_ result: Result<CLLocation, Error>) {
+        timeoutTask?.cancel()
+        timeoutTask = nil
+        awaitingAuthorization = false
+        guard let continuation = locationContinuation else { return }
+        locationContinuation = nil
+        continuation.resume(with: result)
     }
 
     private func resolveOffline(reason: String) async {
