@@ -43,6 +43,9 @@ struct TrailListView: View {
 
         case .loaded(let trails):
             List(trails) { trail in
+                NavigationLink {
+                    TrailDetailView(trail: trail)
+                } label: {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(trail.name)
                         .font(.headline)
@@ -63,6 +66,7 @@ struct TrailListView: View {
                     .foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 4)
+                } // NavigationLink label
             }
 
         case .failed(let message):

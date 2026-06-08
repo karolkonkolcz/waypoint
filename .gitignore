@@ -11,6 +11,7 @@
 
 # iOS / Xcode
 ios/build/
+ios/**/build/
 ios/DerivedData/
 ios/**/xcuserdata/
 ios/**/*.xcuserstate
