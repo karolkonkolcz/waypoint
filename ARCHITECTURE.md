@@ -76,7 +76,7 @@ Each is binding for the MVP.
 | D8 | Offline map tiles undefined — the single biggest technical risk. | Recommend **PMTiles** per-trail region download (see §7.3). Do **not** scrape raw OSM tiles (violates the OSM tile usage policy and is fragile offline). |
 | D9 | Multi-device sync / conflict resolution undefined. | **Last-write-wins by `updated_at`**, justified because every row is owned by exactly one user. Soft deletes via `deleted_at` tombstones. Client-generated **UUIDv7** IDs so offline creation never collides. |
 | D10 | Not every day of a thru-hike is a hiking day (travel to/from the trailhead, rest days). | Add a **`stage_type`** discriminator (`'trek'` \| `'transit'`). A *trek* day has distance/ascent/route/weather; a *transit* day instead carries an editable **`timeline`** (jsonb array of milestones — bus/train/flight/transfer/checkin/meal/note) and an optional **`location_lat/lon/name`** anchor for weather (it has no route midpoint). One `stages` table, not a second entity. See `0005`. |
-| D11 | A stage's calendar date is derived from `trail.start_date + order_index`, but rest days / schedule drift break that 1:1 mapping. | Add a nullable per-stage **`date`** override. NULL = derive as before; an explicit value pins that one day without disturbing neighbours. Derivation lives in `lib/domain/stageDate.ts` (UTC-safe). See `0006`. |
+| D11 | A stage's calendar date is derived from `trail.start_date + order_index`, but rest days / schedule drift break that 1:1 mapping. | Add a nullable per-stage **`date`** override. NULL = derive as before; an explicit value pins that one day without disturbing neighbours. Derivation lives in `web/lib/domain/stageDate.ts` (UTC-safe). See `0006`. |
 | D12 | Hikers carry a mental checklist (resupply, book a hut, charge battery) that belongs to a day, not a route. | Add a synced **`todos`** table — lightweight reminders optionally pinned to a stage and/or date, surfaced on the Today dashboard. Same offline-first ownership/sync shape as other entities. See `0007`. |
 | D13 | The Home hero and trail cards look bare without imagery. | Trails carry an optional **`cover_image_url`**; images are resized + re-encoded to **WebP client-side** and uploaded to a public Supabase Storage bucket (`trail-covers`) scoped to the owner's folder by RLS. See `0008`, `0009`, `0011`. |
 | D14 | The public welcome screen needs curated photography that non-developers can manage. | Admin-managed **`welcome_photos`** + an **`admin_users`** table and `is_admin()` helper; public read of active photos, admin-only writes, backed by a `welcome-photos` storage bucket. See `0010`. |
@@ -388,7 +388,7 @@ GPX file
 └─ <trk> "Deň N"            →  stage (order N-1) +  route (stage_id = stage.id)
 ```
 
-**Parser (`lib/gpx/parse.ts` → `parseGPXTracks`)**
+**Parser (`web/lib/gpx/parse.ts` → `parseGPXTracks`)**
 
 - Splits on `<trk>` / `<rte>` boundaries — never stitches across them.
   Stitching caused phantom ~16 km inter-day jumps (mapy.com exports days
@@ -399,7 +399,7 @@ GPX file
   computed independently. `parseGPX()` merges ordered tracks (with boundary
   dedup) for any caller that still needs a single LineString.
 
-**Orchestration (`lib/gpx/import.ts` → `importTrek`)**
+**Orchestration (`web/lib/gpx/import.ts` → `importTrek`)**
 
 1. `parseGPXTracks(xml)` → ordered `ParsedTrack[]`
 2. `trailRepo.create(...)` — name derived from file name (`deriveTrailName`)
@@ -407,7 +407,7 @@ GPX file
 4. `routeRepo.bulkCreate(...)` — one route per stage, Dexie transaction
 5. Redirect to new trail
 
-**UI (`components/route/GpxImportZone.tsx`)**
+**UI (`web/components/route/GpxImportZone.tsx`)**
 
 - File pick → immediate parse → **preview modal** (N days, total km/↑m,
   per-day list) so the user can confirm before anything is written.
@@ -488,7 +488,7 @@ image/png}` and `file_size_limit = 10 MB` at the bucket level (`0012`).
 ## 6. Weather subsystem
 
 **Provider:** Open-Meteo (keyless, CORS-enabled). The client can call it
-directly, saving a backend hop. Use `app/api/weather/route.ts` only if you later
+directly, saving a backend hop. Use `web/app/api/weather/route.ts` only if you later
 need server-side rate limiting or caching; it is optional for MVP.
 
 **Sampling.** Each stage owns its own route geometry (see §5.1). Sample the
@@ -496,7 +496,7 @@ midpoint of that geometry (`route.total_distance_km / 2` → `pointAtDistance`)
 for the weather fetch. For longer stages, `samplePoints(line, N)` can provide
 additional sample points. Fetch the Open-Meteo hourly forecast for each point.
 
-**"Where will I be when the rain starts?"** (`lib/domain/weather.ts`):
+**"Where will I be when the rain starts?"** (`web/lib/domain/weather.ts`):
 
 1. Compute the hiker's position for each hour of the stage using the ETA engine
    (`positionAt(time)` → point on the LineString).
@@ -510,26 +510,26 @@ additional sample points. Fetch the Open-Meteo hourly forecast for each point.
 when online and `fetched_at` is older than 6 h. Offline, always serve the cached
 snapshot and surface its age in the UI.
 
-**Moving forecast (Today dashboard).** `lib/weather/forecast.ts` builds a
+**Moving forecast (Today dashboard).** `web/lib/weather/forecast.ts` builds a
 three-phase snapshot of the active stage (start / moving / end). At render time
 `visibleSlots.ts` trims it to the hours still *ahead* of now (the
 `MovingForecast` widget never shows hours that already passed). The deterministic
-one-line briefing on the dashboard comes from `lib/domain/daySummary.ts` — every
+one-line briefing on the dashboard comes from `web/lib/domain/daySummary.ts` — every
 clause is templated from the day's own data (no AI, per PRD Non-Goals).
 
 **Current-position weather (`/weather` page).** A standalone screen, decoupled
 from any trail: it geolocates the user (or accepts a place searched via
-`lib/weather/geocoding.ts`, keyless Open-Meteo geocoding) and renders six
+`web/lib/weather/geocoding.ts`, keyless Open-Meteo geocoding) and renders six
 `Meteogram` panels (temperature, cloud cover, precipitation, pressure, wind,
-gusts) drawn with **uPlot**. `lib/weather/current-position.ts` fetches a richer
+gusts) drawn with **uPlot**. `web/lib/weather/current-position.ts` fetches a richer
 hourly payload and caches it in the Dexie `ephemeral_weather` table — a
 **local-only, never-synced** read-through cache keyed by coarse (~1 km)
 coordinates, 6 h staleness, pruned after 24 h. Offline,
-`lib/weather/offline-fallback.ts` reconstructs a meteogram from the active
+`web/lib/weather/offline-fallback.ts` reconstructs a meteogram from the active
 trail's cached stage weather so the page still renders.
 
-**Radar overlay.** `components/weather/RadarMap.tsx` overlays RainViewer past
-radar frames (`lib/weather/rainviewer.ts`) on the map. Free tier (2026): past
+**Radar overlay.** `web/components/weather/RadarMap.tsx` overlays RainViewer past
+radar frames (`web/lib/weather/rainviewer.ts`) on the map. Free tier (2026): past
 ~2 h only, max zoom 7, Universal Blue scheme, attribution required, nowcast
 discontinued — the client degrades to an empty state on any failure.
 
@@ -560,7 +560,7 @@ only hard online dependency.
 
 **F4a (done):** MapLibre GL JS + MapTiler vector tiles.
 
-- `components/map/MapView.tsx` — client-only, code-split via
+- `web/components/map/MapView.tsx` — client-only, code-split via
   `dynamic(…, {ssr:false})`. MapLibre never enters the main bundle.
 - Basemap: **MapTiler outdoor-v2** (`NEXT_PUBLIC_MAPTILER_API_KEY`).
   If the key is absent → graceful fallback: blank `#e8eae6` canvas with
@@ -589,7 +589,7 @@ MeteoAlarm (EUMETNET) CAP JSON feed. The browser cannot call it directly
 (CORS + user-agent blocking), so it goes through a thin server proxy.
 
 **Flow:** Stage page → `GET /api/alerts?lat=…&lon=…` →
-`app/api/alerts/route.ts` (server) → `slugFromLatLon` maps the stage
+`web/app/api/alerts/route.ts` (server) → `slugFromLatLon` maps the stage
 midpoint to a country → `feeds.meteoalarm.org/api/v1/warnings/feeds-{country}` →
 `parseMeteoalarmFeed` normalises CAP JSON → Dexie `alerts` table
 (cache-only, **never synced to Supabase**, 3 h TTL) → `WeatherAlertBadge`.
@@ -599,7 +599,7 @@ midpoint to a country → `feeds.meteoalarm.org/api/v1/warnings/feeds-{country}`
 `awareness_type: "3; Thunderstorm"`, `onset`, `expires`,
 `area[].areaDesc`, `senderName`.
 
-**Normalisation (`lib/alerts/meteoalarm.ts`):**
+**Normalisation (`web/lib/alerts/meteoalarm.ts`):**
 - Prefer English `info` entry; skip green/level-1 and expired warnings.
 - Deduplicate by `(severity, event)`, merge area names, latest expiry
   wins.
@@ -658,13 +658,13 @@ this.version(8).upgrade(/* backfill trails.cover_image_url = null */);
 that backfills existing rows so an older client's IndexedDB never has `undefined`
 fields after the app updates.
 
-The **repositories** layer (`lib/db/repositories/*` — trail, stage, route,
+The **repositories** layer (`web/lib/db/repositories/*` — trail, stage, route,
 waypoint, weather, alerts, todo) is the only code the UI talks to. A repo write
 updates Dexie, sets `_dirty = 1`, and enqueues a `SyncOp`.
 
 ---
 
-## 9. Sync engine (`lib/db/sync.ts`)
+## 9. Sync engine (`web/lib/db/sync.ts`)
 
 Single-user-per-row ownership makes this simple. No CRDTs needed.
 
@@ -714,7 +714,7 @@ sequenceDiagram
 
 ## 10. Domain engines
 
-All engines are **pure functions** in `lib/domain`, with no I/O, fully unit-
+All engines are **pure functions** in `web/lib/domain`, with no I/O, fully unit-
 tested. Recompute difficulty and ETA whenever inputs change; cache results onto
 the stage row.
 
@@ -794,7 +794,7 @@ Practices > 95. Initial load < 2 s on 4G; offline open < 1 s.
 
 ## 12. Validation, config, testing
 
-- **Validation:** Zod schemas in `lib/validation/schemas.ts`, shared by forms,
+- **Validation:** Zod schemas in `web/lib/validation/schemas.ts`, shared by forms,
   repositories, and GPX parsing. GPX-derived data is validated before it ever
   reaches Dexie.
 - **Config:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` only on
