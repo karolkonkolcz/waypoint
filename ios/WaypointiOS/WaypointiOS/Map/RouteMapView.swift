@@ -1,76 +1,83 @@
+import MapLibre
+import MapLibreSwiftDSL
+import MapLibreSwiftUI
 import SwiftUI
 
+/// Real vector basemap (MapTiler `outdoor-v2`, same as the web) with the route
+/// polyline drawn on top from local GRDB geometry, coloured by difficulty and
+/// framed with `fitBounds`. Falls back to the offline `RouteCanvasView` when no
+/// MapTiler key is configured.
+///
+/// - `interactive`: when `false` the map's pan/zoom gestures are disabled so it
+///   can sit inside a `ScrollView`/`List` (dashboard hero, stage section)
+///   without stealing scroll. Full-screen contexts pass `true`.
 struct RouteMapView: View {
     let routes: [MapRoute]
+    /// Kept for source compatibility; embedded maps are non-interactive.
     var interactiveHint: Bool = false
+    var interactive: Bool = false
 
     var body: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .bottomLeading) {
-                Canvas { context, size in
-                    context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(Color(red: 0.91, green: 0.93, blue: 0.89)))
-                    drawGrid(context: context, size: size)
-
-                    let projected = projectRoutes(routes, in: size)
-                    for route in projected {
-                        guard route.points.count >= 2 else { continue }
-                        var path = Path()
-                        path.move(to: route.points[0])
-                        for point in route.points.dropFirst() {
-                            path.addLine(to: point)
-                        }
-                        context.stroke(
-                            path,
-                            with: .color(color(route.color)),
-                            style: StrokeStyle(lineWidth: route.color == .selected ? 5 : 4, lineCap: .round, lineJoin: .round)
-                        )
-                    }
-                }
-                .frame(width: proxy.size.width, height: proxy.size.height)
-
-                if interactiveHint {
-                    Text("Trasa z lokální cache")
-                        .font(.caption2)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(.thinMaterial, in: Capsule())
-                        .padding(8)
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay {
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(.quaternary)
-            }
+        if let styleURL = MapConfig.styleURL {
+            mapLibreView(styleURL: styleURL)
+        } else {
+            RouteCanvasView(routes: routes, showCacheHint: interactiveHint)
         }
     }
 
-    private func drawGrid(context: GraphicsContext, size: CGSize) {
-        var grid = Path()
-        let step: CGFloat = 48
-        var x: CGFloat = step
-        while x < size.width {
-            grid.move(to: CGPoint(x: x, y: 0))
-            grid.addLine(to: CGPoint(x: x, y: size.height))
-            x += step
+    @ViewBuilder
+    private func mapLibreView(styleURL: URL) -> some View {
+        MapView(
+            styleURL: styleURL,
+            camera: .constant(initialCamera)
+        ) {
+            ForEach(Array(routes.enumerated()), id: \.offset) { index, route in
+                let coords = route.line.coordinates.map {
+                    CLLocationCoordinate2D(latitude: $0[1], longitude: $0[0])
+                }
+                let source = ShapeSource(identifier: "route-\(index)") {
+                    MLNPolylineFeature(coordinates: coords, count: UInt(coords.count))
+                }
+                LineStyleLayer(identifier: "route-line-\(index)", source: source)
+                    .lineColor(uiColor(route.color))
+                    .lineWidth(route.color == .selected ? 5 : 4)
+                    .lineCap(.round)
+                    .lineJoin(.round)
+            }
         }
-        var y: CGFloat = step
-        while y < size.height {
-            grid.move(to: CGPoint(x: 0, y: y))
-            grid.addLine(to: CGPoint(x: size.width, y: y))
-            y += step
+        .unsafeMapViewControllerModifier { controller in
+            let mapView = controller.mapView
+            mapView.allowsScrolling = interactive
+            mapView.allowsZooming = interactive
+            mapView.allowsRotating = interactive
+            mapView.allowsTilting = interactive
         }
-        context.stroke(grid, with: .color(.white.opacity(0.45)), lineWidth: 1)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8).stroke(.quaternary)
+        }
     }
 
-    private func color(_ routeColor: MapRouteColor) -> Color {
-        switch routeColor {
-        case .easy: return Color(red: 0.09, green: 0.64, blue: 0.29)
-        case .moderate: return Color(red: 0.85, green: 0.47, blue: 0.02)
-        case .hard: return Color(red: 0.92, green: 0.35, blue: 0.05)
-        case .extreme: return Color(red: 0.86, green: 0.15, blue: 0.15)
-        case .selected: return Color(red: 0.15, green: 0.39, blue: 0.92)
-        case .fallback: return Color(red: 0.15, green: 0.39, blue: 0.92)
+    /// Frame the camera to the merged bounds of all routes.
+    private var initialCamera: MapViewCamera {
+        guard let bbox = mergeBboxes(routes.map { bboxOf($0.line) }) else {
+            return .center(CLLocationCoordinate2D(latitude: 48.7, longitude: 19), zoom: 5)
+        }
+        let bounds = MLNCoordinateBounds(
+            sw: CLLocationCoordinate2D(latitude: bbox.south, longitude: bbox.west),
+            ne: CLLocationCoordinate2D(latitude: bbox.north, longitude: bbox.east)
+        )
+        return .boundingBox(bounds, edgePadding: .init(top: 32, left: 32, bottom: 32, right: 32))
+    }
+
+    private func uiColor(_ color: MapRouteColor) -> UIColor {
+        switch color {
+        case .easy: return UIColor(red: 0.09, green: 0.64, blue: 0.29, alpha: 1)
+        case .moderate: return UIColor(red: 0.85, green: 0.47, blue: 0.02, alpha: 1)
+        case .hard: return UIColor(red: 0.92, green: 0.35, blue: 0.05, alpha: 1)
+        case .extreme: return UIColor(red: 0.86, green: 0.15, blue: 0.15, alpha: 1)
+        case .selected: return UIColor(red: 0.15, green: 0.39, blue: 0.92, alpha: 1)
+        case .fallback: return UIColor(red: 0.15, green: 0.39, blue: 0.92, alpha: 1)
         }
     }
 }

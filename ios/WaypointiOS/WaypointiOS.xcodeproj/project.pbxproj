@@ -10,6 +10,8 @@
 		AA0000000000000000000003 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000002 /* Supabase */; };
 		AA0000000000000000000012 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000011 /* GRDB */; };
 		AA0000000000000000000014 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000013 /* GRDB */; };
+		AA0000000000000000000022 /* MapLibreSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000021 /* MapLibreSwiftUI */; };
+		AA0000000000000000000024 /* MapLibreSwiftDSL in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000023 /* MapLibreSwiftDSL */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -60,6 +62,8 @@
 			files = (
 				AA0000000000000000000003 /* Supabase in Frameworks */,
 				AA0000000000000000000012 /* GRDB in Frameworks */,
+				AA0000000000000000000022 /* MapLibreSwiftUI in Frameworks */,
+				AA0000000000000000000024 /* MapLibreSwiftDSL in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -123,6 +127,8 @@
 			packageProductDependencies = (
 				AA0000000000000000000002 /* Supabase */,
 				AA0000000000000000000011 /* GRDB */,
+				AA0000000000000000000021 /* MapLibreSwiftUI */,
+				AA0000000000000000000023 /* MapLibreSwiftDSL */,
 			);
 			productName = WaypointiOS;
 			productReference = E1843C012FD6ECF200766946 /* WaypointiOS.app */;
@@ -210,6 +216,7 @@
 			packageReferences = (
 				AA0000000000000000000001 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 				AA0000000000000000000010 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
+				AA0000000000000000000020 /* XCRemoteSwiftPackageReference "swiftui-dsl" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E1843C022FD6ECF200766946 /* Products */;
@@ -416,11 +423,11 @@
 				DEVELOPMENT_TEAM = WP48MC25PW;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Waypoint potřebuje polohu pro zobrazení aktuálního počasí.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Waypoint potřebuje polohu pro zobrazení aktuálního počasí.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -449,11 +456,11 @@
 				DEVELOPMENT_TEAM = WP48MC25PW;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Waypoint potřebuje polohu pro zobrazení aktuálního počasí.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Waypoint potřebuje polohu pro zobrazení aktuálního počasí.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -614,6 +621,14 @@
 				minimumVersion = 6.0.0;
 			};
 		};
+		AA0000000000000000000020 /* XCRemoteSwiftPackageReference "swiftui-dsl" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/maplibre/swiftui-dsl.git";
+			requirement = {
+				kind = upToNextMinorVersion;
+				minimumVersion = 0.25.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -631,6 +646,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AA0000000000000000000010 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
 			productName = GRDB;
+		};
+		AA0000000000000000000021 /* MapLibreSwiftUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA0000000000000000000020 /* XCRemoteSwiftPackageReference "swiftui-dsl" */;
+			productName = MapLibreSwiftUI;
+		};
+		AA0000000000000000000023 /* MapLibreSwiftDSL */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA0000000000000000000020 /* XCRemoteSwiftPackageReference "swiftui-dsl" */;
+			productName = MapLibreSwiftDSL;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

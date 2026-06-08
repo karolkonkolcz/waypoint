@@ -17,7 +17,8 @@ struct TrailMapView: View {
                 ContentUnavailableView("Mapa není k dispozici", systemImage: "map", description: Text(message))
             case .loaded(let routes):
                 VStack(spacing: 0) {
-                    RouteMapView(routes: routes, interactiveHint: true)
+                    RouteMapView(routes: routes, interactive: true)
+                        .frame(maxHeight: .infinity)
                     Legend(routes: routes)
                 }
                 .padding()
