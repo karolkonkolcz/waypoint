@@ -112,7 +112,7 @@ private struct WeatherSection: View {
                     .frame(height: 190)
                     .padding(.vertical, 6)
                 if let hour = snapshot.rainStartsHour, let km = snapshot.rainStartsKm {
-                    Label("Déšť kolem \(formatWeatherHour(hour)), přibližně na \(String(format: "%.1f km", km))", systemImage: "cloud.rain")
+                    Label("Déšť kolem \(formatHour(hour)), přibližně na \(String(format: "%.1f km", km))", systemImage: "cloud.rain")
                         .foregroundStyle(.blue)
                 } else {
                     Label("Déšť na trase zatím nevychází", systemImage: "checkmark.circle")
@@ -183,38 +183,7 @@ private struct WeatherSummary: View {
     }
 }
 
-private struct MeteogramView: View {
-    let entries: [WeatherEntry]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Chart(entries) { entry in
-                LineMark(
-                    x: .value("Čas", formatWeatherHour(entry.hour)),
-                    y: .value("Teplota", entry.tempC)
-                )
-                .foregroundStyle(.red)
-                PointMark(
-                    x: .value("Čas", formatWeatherHour(entry.hour)),
-                    y: .value("Teplota", entry.tempC)
-                )
-                .foregroundStyle(.red)
-            }
-            .chartYAxisLabel("°C")
-
-            Chart(entries) { entry in
-                BarMark(
-                    x: .value("Čas", formatWeatherHour(entry.hour)),
-                    y: .value("Srážky", entry.precipMm)
-                )
-                .foregroundStyle(.blue)
-            }
-            .chartYAxisLabel("mm")
-        }
-    }
-}
-
-private func formatWeatherHour(_ hour: Int) -> String {
+private func formatHour(_ hour: Int) -> String {
     let dayHour = hour >= 24 ? hour - 24 : hour
     return String(format: "%02d:00", dayHour)
 }

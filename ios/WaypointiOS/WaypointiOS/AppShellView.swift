@@ -12,6 +12,16 @@ struct AppShellView: View {
                 .tabItem {
                     Label("Trasy", systemImage: "map")
                 }
+
+            WeatherTabView()
+                .tabItem {
+                    Label("Počasí", systemImage: "cloud.sun")
+                }
+
+            SettingsView()
+                .tabItem {
+                    Label("Nastavení", systemImage: "gearshape")
+                }
         }
     }
 }
