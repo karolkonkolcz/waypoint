@@ -5,11 +5,13 @@
 //  Stage detail: difficulty badge, ETA, terrain stats, notes.
 //
 
+import Charts
 import SwiftUI
 
 struct StageDetailView: View {
     let stage: Stage
     let trail: Trail
+    @State private var weatherModel = StageWeatherViewModel()
 
     private var difficulty: DifficultyResult {
         stage.computedDifficulty(paceKmh: trail.defaultPaceKmh)
@@ -57,9 +59,15 @@ struct StageDetailView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            WeatherSection(state: weatherModel.state) {
+                Task { await weatherModel.refresh(stage: stage, trail: trail) }
+            }
         }
         .navigationTitle(stage.title)
         .navigationBarTitleDisplayMode(.inline)
+        .task { await weatherModel.load(stage: stage, trail: trail) }
+        .refreshable { await weatherModel.refresh(stage: stage, trail: trail) }
     }
 
     private var formattedETA: String {
@@ -72,6 +80,124 @@ struct StageDetailView: View {
 }
 
 // MARK: - Helpers
+
+private struct WeatherSection: View {
+    let state: StageWeatherViewModel.State
+    let refresh: () -> Void
+
+    var body: some View {
+        Section("Počasí") {
+            switch state {
+            case .idle, .loading:
+                HStack {
+                    ProgressView()
+                    Text("Načítám počasí…")
+                        .foregroundStyle(.secondary)
+                }
+
+            case .unavailable(let message):
+                ContentUnavailableView {
+                    Label("Počasí není k dispozici", systemImage: "cloud.sun")
+                } description: {
+                    Text(message)
+                } actions: {
+                    Button("Zkusit znovu", action: refresh)
+                }
+
+            case .loaded(let snapshot, let fetchedAt, let isStale, let isRefreshing, let message):
+                WeatherSummary(snapshot: snapshot, fetchedAt: fetchedAt, isStale: isStale, isRefreshing: isRefreshing)
+                MeteogramView(entries: snapshot.entries)
+                    .frame(height: 190)
+                    .padding(.vertical, 6)
+                if let hour = snapshot.rainStartsHour, let km = snapshot.rainStartsKm {
+                    Label("Déšť kolem \(formatWeatherHour(hour)), přibližně na \(String(format: "%.1f km", km))", systemImage: "cloud.rain")
+                        .foregroundStyle(.blue)
+                } else {
+                    Label("Déšť na trase zatím nevychází", systemImage: "checkmark.circle")
+                        .foregroundStyle(.secondary)
+                }
+                if let message {
+                    Text(message)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}
+
+private struct WeatherSummary: View {
+    let snapshot: WeatherSnapshot
+    let fetchedAt: Date
+    let isStale: Bool
+    let isRefreshing: Bool
+
+    private var midday: WeatherEntry? {
+        snapshot.entries.first { $0.hour == 12 } ?? snapshot.entries.first
+    }
+
+    var body: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                if let midday {
+                    Text("\(weatherConditionLabel(midday.condition)), \(midday.tempC) °C")
+                        .font(.headline)
+                    Text("Srážky \(String(format: "%.1f mm", snapshot.precipTotalMm)) · vítr max \(snapshot.windMaxKmh) km/h")
+                        .foregroundStyle(.secondary)
+                }
+                Text("\(isStale ? "Uložená" : "Aktuální") · \(relativeAge(fetchedAt))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if isRefreshing {
+                ProgressView()
+            }
+        }
+    }
+}
+
+private struct MeteogramView: View {
+    let entries: [WeatherEntry]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Chart(entries) { entry in
+                LineMark(
+                    x: .value("Čas", formatWeatherHour(entry.hour)),
+                    y: .value("Teplota", entry.tempC)
+                )
+                .foregroundStyle(.red)
+                PointMark(
+                    x: .value("Čas", formatWeatherHour(entry.hour)),
+                    y: .value("Teplota", entry.tempC)
+                )
+                .foregroundStyle(.red)
+            }
+            .chartYAxisLabel("°C")
+
+            Chart(entries) { entry in
+                BarMark(
+                    x: .value("Čas", formatWeatherHour(entry.hour)),
+                    y: .value("Srážky", entry.precipMm)
+                )
+                .foregroundStyle(.blue)
+            }
+            .chartYAxisLabel("mm")
+        }
+    }
+}
+
+private func formatWeatherHour(_ hour: Int) -> String {
+    let dayHour = hour >= 24 ? hour - 24 : hour
+    return String(format: "%02d:00", dayHour)
+}
+
+private func relativeAge(_ date: Date) -> String {
+    let formatter = RelativeDateTimeFormatter()
+    formatter.unitsStyle = .short
+    return formatter.localizedString(for: date, relativeTo: Date())
+}
 
 private struct StatRow: View {
     let label: String
