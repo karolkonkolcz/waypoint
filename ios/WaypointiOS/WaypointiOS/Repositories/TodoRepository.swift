@@ -50,6 +50,15 @@ struct TodoRepository {
         }
     }
 
+    func findByTrail(trailId: String) throws -> [Todo] {
+        try db.dbPool.read { db in
+            try Todo
+                .filter(Column("trail_id") == trailId && Column("deleted_at") == nil)
+                .order(Column("done").asc, Column("order_index").asc)
+                .fetchAll(db)
+        }
+    }
+
     func add(_ input: CreateInput) throws -> Todo {
         let now = Date()
         return try db.dbPool.write { db in

@@ -18,7 +18,7 @@ struct ContentView: View {
         case .enterEmail, .enterCode:
             LoginView()
         case .signedIn:
-            TrailListView()
+            AppShellView()
         }
     }
 }

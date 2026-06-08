@@ -84,6 +84,15 @@ struct StageRepository {
         }
     }
 
+    func findByTrail(trailId: String) throws -> [Stage] {
+        try db.dbPool.read { db in
+            try Stage
+                .filter(Column("trail_id") == trailId && Column("deleted_at") == nil)
+                .order(Column("order_index").asc)
+                .fetchAll(db)
+        }
+    }
+
     func create(_ input: CreateInput) throws -> Stage {
         let now = Date()
         var row = makeStage(input, id: newUUIDv7(), createdAt: now, updatedAt: now)
