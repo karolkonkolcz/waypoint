@@ -1,36 +1,47 @@
-//
-//  Stage.swift
-//  WaypointiOS
-//
-//  Read-only mirror of the `stages` row. Column names stay snake_case to match
-//  Postgres; CodingKeys map them to Swift camelCase.
-//
-
 import Foundation
+import GRDB
 
-struct Stage: Identifiable, Decodable, Sendable {
-    let id: String
-    let trailId: String
-    let title: String
-    let orderIndex: Int
-    let stageType: String
-    let distanceKm: Double
-    let ascentM: Double
-    let descentM: Double
-    let difficultyScore: Int?
-    let difficultyClass: String?
-    let date: String?
-    let startDistanceKm: Double?
-    let endDistanceKm: Double?
-    let locationName: String?
-    let locationLat: Double?
-    let locationLon: Double?
-    let notes: String?
-    let createdAt: String
+// GRDB record for stages. Mirrors Postgres schema snake_case columns exactly.
+// `timeline` (jsonb) is stored as raw JSON text; decoded from GRDB only,
+// never written from the Supabase DTO in Phase 2.
+
+struct Stage: Identifiable, Sendable {
+    var id: String
+    var trailId: String
+    var userId: String
+    var title: String
+    var orderIndex: Int
+    var stageType: String           // "trek" | "transit"
+    var distanceKm: Double
+    var ascentM: Double
+    var descentM: Double
+    var difficultyScore: Int?
+    var difficultyClass: String?
+    var date: String?               // nullable DATE override "YYYY-MM-DD"
+    var startDistanceKm: Double?
+    var endDistanceKm: Double?
+    var locationName: String?
+    var locationLat: Double?
+    var locationLon: Double?
+    var notes: String?
+    var timeline: String?           // jsonb stored as text; nil until Phase 3 writes it
+    var createdAt: Date
+    var updatedAt: Date
+    var deletedAt: Date?
+    var dirty: Bool
+}
+
+// MARK: - GRDB conformance
+
+extension Stage: Codable, FetchableRecord, MutablePersistableRecord {
+    static let databaseTableName = "stages"
+    static var databaseDateDecodingStrategy: DatabaseDateDecodingStrategy { .timeIntervalSince1970 }
+    static var databaseDateEncodingStrategy: DatabaseDateEncodingStrategy { .timeIntervalSince1970 }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, notes
+        case id, title, notes, timeline
         case trailId = "trail_id"
+        case userId = "user_id"
         case orderIndex = "order_index"
         case stageType = "stage_type"
         case distanceKm = "distance_km"
@@ -45,11 +56,15 @@ struct Stage: Identifiable, Decodable, Sendable {
         case locationLat = "location_lat"
         case locationLon = "location_lon"
         case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case deletedAt = "deleted_at"
+        case dirty = "_dirty"
     }
 }
 
+// MARK: - Domain helpers (same as Phase 1)
+
 extension Stage {
-    /// Live-computed difficulty (server value may lag; use for display).
     func computedDifficulty(paceKmh: Double) -> DifficultyResult {
         scoreDifficulty(DifficultyInput(distanceKm: distanceKm, ascentM: ascentM, descentM: descentM))
     }

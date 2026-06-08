@@ -1,14 +1,8 @@
-//
-//  TrailListViewModel.swift
-//  WaypointiOS
-//
-//  Phase 0 reads `trails` directly from Supabase to prove the backend recycles
-//  end-to-end. From Phase 2 the UI will read GRDB instead (never Supabase) — see
-//  IOS_STRATEGY.md §4 "Reads".
-//
-
 import Foundation
-import Supabase
+
+// Reads trails from GRDB via ValueObservation — never from Supabase directly.
+// The UI always sees data from the local cache; SyncEngine keeps that cache fresh.
+// See IOS_STRATEGY.md §I9 and §4 "Reads".
 
 @MainActor
 @Observable
@@ -22,21 +16,32 @@ final class TrailListViewModel {
 
     var state: State = .idle
 
-    private let client = SupabaseManager.shared.client
+    private let repo = TrailRepository()
+    private var observationTask: Task<Void, Never>?
 
+    // Called by .task { } and .refreshable { } in the view.
+    // First call starts the live observation; subsequent calls (e.g. pull-to-refresh)
+    // also trigger a Supabase pull so fresh data appears quickly.
     func load() async {
-        state = .loading
-        do {
-            let trails: [Trail] = try await client
-                .from("trails")
-                .select()
-                .is("deleted_at", value: nil)
-                .order("created_at", ascending: false)
-                .execute()
-                .value
-            state = .loaded(trails)
-        } catch {
-            state = .failed(error.localizedDescription)
+        startObservationIfNeeded()
+        await SyncEngine.shared.pull()
+    }
+
+    // MARK: - Private
+
+    private func startObservationIfNeeded() {
+        guard observationTask == nil else { return }
+        if case .loaded = state { } else { state = .loading }
+
+        observationTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                for try await trails in repo.observeAll() {
+                    self.state = .loaded(trails)
+                }
+            } catch {
+                self.state = .failed(error.localizedDescription)
+            }
         }
     }
 }

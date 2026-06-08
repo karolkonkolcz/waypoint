@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		AA0000000000000000000003 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000002 /* Supabase */; };
+		AA0000000000000000000012 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000011 /* GRDB */; };
+		AA0000000000000000000014 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000013 /* GRDB */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -57,6 +59,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA0000000000000000000003 /* Supabase in Frameworks */,
+				AA0000000000000000000012 /* GRDB in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -64,6 +67,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA0000000000000000000014 /* GRDB in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -118,6 +122,7 @@
 			name = WaypointiOS;
 			packageProductDependencies = (
 				AA0000000000000000000002 /* Supabase */,
+				AA0000000000000000000011 /* GRDB */,
 			);
 			productName = WaypointiOS;
 			productReference = E1843C012FD6ECF200766946 /* WaypointiOS.app */;
@@ -141,6 +146,7 @@
 			);
 			name = WaypointiOSTests;
 			packageProductDependencies = (
+				AA0000000000000000000013 /* GRDB */,
 			);
 			productName = WaypointiOSTests;
 			productReference = E1843C0E2FD6ECF400766946 /* WaypointiOSTests.xctest */;
@@ -203,6 +209,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				AA0000000000000000000001 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				AA0000000000000000000010 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E1843C022FD6ECF200766946 /* Products */;
@@ -597,6 +604,14 @@
 				minimumVersion = 2.0.0;
 			};
 		};
+		AA0000000000000000000010 /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/GRDB.swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -604,6 +619,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AA0000000000000000000001 /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Supabase;
+		};
+		AA0000000000000000000011 /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA0000000000000000000010 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
+		};
+		AA0000000000000000000013 /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA0000000000000000000010 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

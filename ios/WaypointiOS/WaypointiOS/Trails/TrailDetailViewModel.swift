@@ -1,12 +1,7 @@
-//
-//  TrailDetailViewModel.swift
-//  WaypointiOS
-//
-//  Phase 1: reads stages directly from Supabase. From Phase 2, switches to GRDB.
-//
-
 import Foundation
-import Supabase
+
+// Reads stages for a trail from GRDB via ValueObservation.
+// load(trailId:) is idempotent — the observation runs once per view lifetime.
 
 @MainActor
 @Observable
@@ -20,22 +15,35 @@ final class TrailDetailViewModel {
 
     var state: State = .idle
 
-    private let client = SupabaseManager.shared.client
+    private let repo = StageRepository()
+    private var observationTask: Task<Void, Never>?
+    private var currentTrailId: String?
 
     func load(trailId: String) async {
-        state = .loading
-        do {
-            let stages: [Stage] = try await client
-                .from("stages")
-                .select()
-                .eq("trail_id", value: trailId)
-                .is("deleted_at", value: nil)
-                .order("order_index", ascending: true)
-                .execute()
-                .value
-            state = .loaded(stages)
-        } catch {
-            state = .failed(error.localizedDescription)
+        if currentTrailId != trailId {
+            observationTask?.cancel()
+            observationTask = nil
+            currentTrailId = trailId
+        }
+        startObservationIfNeeded(trailId: trailId)
+        await SyncEngine.shared.pull()
+    }
+
+    // MARK: - Private
+
+    private func startObservationIfNeeded(trailId: String) {
+        guard observationTask == nil else { return }
+        if case .loaded = state { } else { state = .loading }
+
+        observationTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                for try await stages in repo.observeByTrail(trailId: trailId) {
+                    self.state = .loaded(stages)
+                }
+            } catch {
+                self.state = .failed(error.localizedDescription)
+            }
         }
     }
 }
