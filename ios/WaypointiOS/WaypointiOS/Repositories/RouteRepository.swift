@@ -67,6 +67,15 @@ struct RouteRepository {
         }
     }
 
+    func findAllByTrail(trailId: String) throws -> [Route] {
+        try db.dbPool.read { db in
+            try Route
+                .filter(Column("trail_id") == trailId && Column("deleted_at") == nil)
+                .order(Column("stage_id").asc)
+                .fetchAll(db)
+        }
+    }
+
     func upsert(_ input: CreateInput) throws -> Route {
         let now = Date()
         return try db.dbPool.write { db in

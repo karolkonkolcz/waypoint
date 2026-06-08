@@ -63,6 +63,8 @@ struct StageDetailView: View {
             WeatherSection(state: weatherModel.state) {
                 Task { await weatherModel.refresh(stage: stage, trail: trail) }
             }
+
+            StageMapSection(stage: stage)
         }
         .navigationTitle(stage.title)
         .navigationBarTitleDisplayMode(.inline)
@@ -123,6 +125,30 @@ private struct WeatherSection: View {
                 }
             }
         }
+    }
+}
+
+private struct StageMapSection: View {
+    let stage: Stage
+    @State private var model = RouteMapViewModel()
+
+    var body: some View {
+        Section("Mapa") {
+            switch model.state {
+            case .idle, .loading:
+                HStack {
+                    ProgressView()
+                    Text("Načítám trasu…")
+                        .foregroundStyle(.secondary)
+                }
+            case .unavailable(let message):
+                ContentUnavailableView("Mapa není k dispozici", systemImage: "map", description: Text(message))
+            case .loaded(let routes):
+                RouteMapView(routes: routes, interactiveHint: true)
+                    .frame(height: 224)
+            }
+        }
+        .task { model.load(stage: stage) }
     }
 }
 

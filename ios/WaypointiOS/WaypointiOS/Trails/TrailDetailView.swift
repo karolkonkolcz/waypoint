@@ -51,6 +51,16 @@ struct TrailDetailView: View {
                     }
                 }
             }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
+                        TrailMapView(trail: trail, stages: stages)
+                    } label: {
+                        Image(systemName: "map")
+                    }
+                    .accessibilityLabel("Mapa")
+                }
+            }
 
         case .failed(let message):
             ContentUnavailableView {

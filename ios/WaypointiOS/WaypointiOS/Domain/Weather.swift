@@ -186,20 +186,6 @@ func decodeWeatherSamples(_ rows: [WeatherRow]) -> [WeatherSampleCache] {
     }
 }
 
-func decodeLineString(_ json: String) -> LineString? {
-    struct GeoJSONLineString: Decodable {
-        var type: String
-        var coordinates: [[Double]]
-    }
-    guard
-        let data = json.data(using: .utf8),
-        let decoded = try? JSONDecoder().decode(GeoJSONLineString.self, from: data),
-        decoded.type == "LineString",
-        decoded.coordinates.count >= 2
-    else { return nil }
-    return LineString(coordinates: decoded.coordinates)
-}
-
 func decodeElevationProfile(_ json: String) -> [ElevationPoint] {
     struct RawElevationPoint: Decodable {
         var dKm: Double

@@ -130,3 +130,17 @@ func mergeBboxes(_ boxes: [BBox]) -> BBox? {
     }
     return result
 }
+
+func decodeLineString(_ json: String) -> LineString? {
+    struct GeoJSONLineString: Decodable {
+        var type: String
+        var coordinates: [[Double]]
+    }
+    guard
+        let data = json.data(using: .utf8),
+        let decoded = try? JSONDecoder().decode(GeoJSONLineString.self, from: data),
+        decoded.type == "LineString",
+        decoded.coordinates.count >= 2
+    else { return nil }
+    return LineString(coordinates: decoded.coordinates)
+}
