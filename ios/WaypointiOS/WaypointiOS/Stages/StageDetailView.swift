@@ -108,6 +108,10 @@ private struct WeatherSection: View {
 
             case .loaded(let snapshot, let series, let fetchedAt, let isStale, let isRefreshing, let message):
                 WeatherSummary(snapshot: snapshot, fetchedAt: fetchedAt, isStale: isStale, isRefreshing: isRefreshing)
+                if let start = snapshot.startHour, let arrival = snapshot.arrivalHour, snapshot.moving != nil {
+                    MovingWeatherBanner(startHour: start, arrivalHour: arrival)
+                        .padding(.vertical, 4)
+                }
                 MeteogramView(series: series)
                     .padding(.vertical, 6)
                 if let hour = snapshot.rainStartsHour, let km = snapshot.rainStartsKm {

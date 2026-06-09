@@ -6,7 +6,12 @@ struct TodayView: View {
     var body: some View {
         NavigationStack {
             content
-                .navigationTitle("Dnes")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        WaypointLockup(size: 20)
+                    }
+                }
                 .task { await model.load() }
                 .refreshable { await model.load() }
         }
@@ -81,7 +86,16 @@ private struct TodayDashboardView: View {
             VStack(alignment: .leading, spacing: 16) {
                 hero
                 stats
-                weather
+                if dashboard.weather != nil {
+                    NavigationLink {
+                        StageDetailView(stage: dashboard.stage, trail: dashboard.trail)
+                    } label: {
+                        weather
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    weather
+                }
                 Text(dashboard.summary)
                     .font(.body)
                     .padding()
@@ -90,6 +104,17 @@ private struct TodayDashboardView: View {
                     .overlay {
                         RoundedRectangle(cornerRadius: 8).stroke(.quaternary)
                     }
+                if let snapshot = dashboard.weather,
+                   let start = snapshot.startHour,
+                   let arrival = snapshot.arrivalHour,
+                   snapshot.moving != nil {
+                    MovingWeatherBanner(startHour: start, arrivalHour: arrival)
+                        .padding()
+                        .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 8).stroke(.quaternary)
+                        }
+                }
                 TodoPanel(
                     todos: dashboard.todos,
                     newTodoText: $newTodoText,
@@ -138,8 +163,14 @@ private struct TodayDashboardView: View {
     private var weather: some View {
         if let snapshot = dashboard.weather {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Počasí")
-                    .font(.headline)
+                HStack {
+                    Text("Počasí")
+                        .font(.headline)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
                 HStack {
                     if let midday = snapshot.entries.first(where: { $0.hour == 12 }) ?? snapshot.entries.first {
                         Text("\(weatherConditionLabel(midday.condition)), \(midday.tempC) °C")

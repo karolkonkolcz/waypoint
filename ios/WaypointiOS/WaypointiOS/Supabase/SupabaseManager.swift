@@ -24,7 +24,17 @@ final class SupabaseManager {
     private init() {
         client = SupabaseClient(
             supabaseURL: SupabaseConfig.url,
-            supabaseKey: SupabaseConfig.publishableKey
+            supabaseKey: SupabaseConfig.publishableKey,
+            options: SupabaseClientOptions(
+                // Opt in to the upcoming default: emit the locally stored session
+                // as the initial session immediately, instead of after a refresh.
+                // Silences supabase-swift's legacy-behavior runtime warning. We don't
+                // consume `.initialSession` — bootstrap() reads `auth.session` directly
+                // (which refreshes/validates), so this only affects the advisory.
+                auth: SupabaseClientOptions.AuthOptions(
+                    emitLocalSessionAsInitialSession: true
+                )
+            )
         )
     }
 
