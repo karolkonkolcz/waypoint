@@ -1,5 +1,6 @@
 import CoreLocation
 import GRDB
+import MapKit
 import SwiftUI
 
 // MARK: - ViewModel
@@ -66,7 +67,7 @@ final class WeatherTabViewModel: NSObject, CLLocationManagerDelegate {
             // Fetch the summary snapshot (condition/current temp) and the richer
             // meteogram forecast concurrently — both hit the same free API.
             async let snapshotResults = client.fetch(
-                points: [Coord2(lat: lat, lon: lon)],
+                points: [Coord2(lon: lon, lat: lat)],
                 date: today,
                 endDate: nil
             )
@@ -176,10 +177,14 @@ final class WeatherTabViewModel: NSObject, CLLocationManagerDelegate {
 
     private func reverseGeocode(lat: Double, lon: Double) async -> String? {
         let location = CLLocation(latitude: lat, longitude: lon)
-        let geocoder = CLGeocoder()
-        guard let placemarks = try? await geocoder.reverseGeocodeLocation(location),
-              let placemark = placemarks.first else { return nil }
-        let parts = [placemark.locality, placemark.administrativeArea, placemark.country]
+        guard let request = MKReverseGeocodingRequest(location: location),
+              let items = try? await request.mapItems,
+              let item = items.first else { return nil }
+        if let contextualCity = item.addressRepresentations?.cityWithContext(.automatic),
+           !contextualCity.isEmpty {
+            return contextualCity
+        }
+        let parts = [item.addressRepresentations?.cityName, item.addressRepresentations?.regionName]
             .compactMap { $0 }
         return parts.isEmpty ? nil : parts.prefix(2).joined(separator: ", ")
     }

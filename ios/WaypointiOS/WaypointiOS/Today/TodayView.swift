@@ -264,14 +264,72 @@ private struct RouteProfilePanel: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            ElevationProfileGraph(profile: profile, rain: rain)
-                .frame(height: 142)
+            ElevationProfileChart(profile: profile, rain: rain)
         }
         .padding()
         .background(.background, in: RoundedRectangle(cornerRadius: 8))
         .overlay {
             RoundedRectangle(cornerRadius: 8).stroke(.quaternary)
         }
+    }
+}
+
+private struct ElevationProfileChart: View {
+    let profile: [ElevationPoint]
+    let rain: RainOnset?
+
+    private var maxDistanceKm: Double {
+        max(profile.last?.dKm ?? 0, 0)
+    }
+
+    private var minElevationM: Int {
+        Int((profile.map(\.eleM).min() ?? 0).rounded())
+    }
+
+    private var maxElevationM: Int {
+        Int((profile.map(\.eleM).max() ?? 0).rounded())
+    }
+
+    var body: some View {
+        VStack(spacing: 4) {
+            HStack(alignment: .center, spacing: 6) {
+                Text("Výška (m)")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(-90))
+                    .fixedSize()
+                    .frame(width: 18, height: 126)
+
+                VStack(spacing: 3) {
+                    HStack {
+                        Text("\(maxElevationM) m")
+                        Spacer()
+                    }
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+
+                    ElevationProfileGraph(profile: profile, rain: rain)
+                        .frame(height: 112)
+
+                    HStack {
+                        Text("0 km")
+                        Spacer()
+                        Text(String(format: "%.1f km", maxDistanceKm))
+                    }
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                }
+            }
+
+            Text("Vzdálenost (km)")
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.leading, 24)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Výškový profil. Osa X vzdálenost v kilometrech, osa Y výška v metrech.")
+        .accessibilityValue("Od \(minElevationM) do \(maxElevationM) metrů, délka \(String(format: "%.1f", maxDistanceKm)) kilometru.")
     }
 }
 

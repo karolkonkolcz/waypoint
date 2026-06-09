@@ -89,7 +89,11 @@ struct MeteogramView: View {
     // Rain + snow as a genuine stacked bar (rain bottom, snow on top).
     private var precipitationChart: some View {
         Chart(precipPoints) { point in
-            BarMark(x: .value("Čas", point.date), y: .value("Srážky", point.value))
+            BarMark(
+                x: .value("Čas", point.date, unit: .hour),
+                y: .value("Srážky", point.value),
+                width: .fixed(5)
+            )
                 .foregroundStyle(by: .value("Typ", point.kind))
         }
         .chartForegroundStyleScale(["déšť": Palette.rain, "sníh": Palette.snow])
