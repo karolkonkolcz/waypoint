@@ -101,6 +101,52 @@ struct MeteogramSeriesTests {
         #expect(series.cloudLow == nil)
         #expect(series.pressure == nil)
     }
+
+    @Test func limitedSeriesCanFilterToStageDate() {
+        let precipitation = Array(0 ..< 72).map(Double.init)
+        let result = makeResult(precipitation: precipitation)
+        let series = limitedMeteogramSeries(from: result, date: "2026-06-06", hourLimit: 24)
+
+        #expect(series.time.count == 24)
+        #expect(series.rain?.first == 24)
+        #expect(series.rain?.last == 47)
+    }
+
+    @Test func richForecastCanLimitTo48Hours() throws {
+        let hourlyTimes = (0 ..< 72).map { index in
+            let day = index < 24 ? "2026-06-09" : index < 48 ? "2026-06-10" : "2026-06-11"
+            return "\(day)T\(String(format: "%02d", index % 24)):00"
+        }
+        let forecast = RichForecast(
+            latitude: 50,
+            longitude: 14,
+            hourly: RichForecast.Hourly(
+                time: hourlyTimes,
+                temperature2m: Array(repeating: 12, count: 72),
+                cloudCoverLow: Array(repeating: 10, count: 72),
+                cloudCoverMid: Array(repeating: 20, count: 72),
+                cloudCoverHigh: Array(repeating: 30, count: 72),
+                rain: Array(repeating: 0, count: 72),
+                snowfall: Array(repeating: 0, count: 72),
+                pressureMsl: Array(repeating: 1012, count: 72),
+                windSpeed10m: Array(repeating: 5, count: 72),
+                windGusts10m: Array(repeating: 8, count: 72),
+                windDirection10m: Array(repeating: 180, count: 72)
+            ),
+            daily: RichForecast.Daily(
+                time: ["2026-06-09", "2026-06-10", "2026-06-11"],
+                temperature2mMax: [18, 19, 20],
+                temperature2mMin: [8, 9, 10]
+            )
+        )
+
+        let series = forecastToMeteogram(forecast, hourLimit: 48)
+
+        #expect(series.time.count == 48)
+        #expect(series.temperature?.count == 48)
+        #expect(series.tempMin?.first == 8)
+        #expect(series.tempMax?.last == 19)
+    }
 }
 
 private func makeResult(
@@ -109,7 +155,7 @@ private func makeResult(
     precipitation: [Double]
 ) -> OpenMeteoResult {
     let times = (0 ..< precipitation.count).map { index in
-        let day = index < 24 ? "2026-06-05" : "2026-06-06"
+        let day = String(format: "2026-06-%02d", 5 + (index / 24))
         return "\(day)T\(String(format: "%02d", index % 24)):00"
     }
     return OpenMeteoResult(

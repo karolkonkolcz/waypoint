@@ -6,24 +6,39 @@ import SwiftUI
 struct MovingWeatherBanner: View {
     let startHour: Int
     let arrivalHour: Int
+    @State private var isExpanded = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("Počasí podél trasy", systemImage: "figure.walk.motion")
-                .font(.subheadline.weight(.semibold))
+            Button {
+                withAnimation(.snappy(duration: 0.18)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack {
+                    Label("Počasí podél trasy", systemImage: "figure.walk.motion")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.semibold))
+                }
                 .foregroundStyle(.blue)
-
-            HStack(spacing: 4) {
-                phase("Start", detail: formatHour(startHour), icon: "flag")
-                connector
-                phase("Na trase", detail: nil, icon: "point.topleft.down.to.point.bottomright.curvepath")
-                connector
-                phase("Cíl", detail: formatHour(arrivalHour), icon: "flag.checkered")
             }
+            .buttonStyle(.plain)
 
-            Text("Předpověď tě sleduje, jak postupuješ — ne jeden pevný bod.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if isExpanded {
+                HStack(spacing: 4) {
+                    phase("Start", detail: formatHour(startHour), icon: "flag")
+                    connector
+                    phase("Na trase", detail: nil, icon: "point.topleft.down.to.point.bottomright.curvepath")
+                    connector
+                    phase("Cíl", detail: formatHour(arrivalHour), icon: "flag.checkered")
+                }
+
+                Text("Předpověď tě sleduje, jak postupuješ — ne jeden pevný bod.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 

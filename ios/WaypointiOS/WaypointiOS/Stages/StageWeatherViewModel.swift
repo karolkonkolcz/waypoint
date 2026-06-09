@@ -21,7 +21,7 @@ final class StageWeatherViewModel {
         let isFresh = weatherRepo.isFresh(cached)
 
         if let snapshot = makeSnapshot(rows: cached, stage: stage, trail: trail), let fetchedAt = cached.map(\.fetchedAt).max() {
-            state = .loaded(snapshot, series: makeSeries(rows: cached), fetchedAt: fetchedAt, isStale: !isFresh, isRefreshing: !isFresh, message: nil)
+            state = .loaded(snapshot, series: makeSeries(rows: cached, date: snapshot.date), fetchedAt: fetchedAt, isStale: !isFresh, isRefreshing: !isFresh, message: nil)
         } else {
             state = .loading
         }
@@ -65,7 +65,7 @@ final class StageWeatherViewModel {
 
             let rows = try weatherRepo.saveSamples(inputs)
             if let snapshot = makeSnapshot(rows: rows, stage: stage, trail: trail), let fetchedAt = rows.map(\.fetchedAt).max() {
-                state = .loaded(snapshot, series: makeSeries(rows: rows), fetchedAt: fetchedAt, isStale: false, isRefreshing: false, message: nil)
+                state = .loaded(snapshot, series: makeSeries(rows: rows, date: snapshot.date), fetchedAt: fetchedAt, isStale: false, isRefreshing: false, message: nil)
             } else {
                 state = .unavailable("Počasí se nepodařilo uložit.")
             }
@@ -83,15 +83,20 @@ final class StageWeatherViewModel {
     /// Limited hourly series (temperature / precipitation / wind) from the
     /// midpoint sample's raw forecast — drives the stage-detail meteogram with
     /// real hourly data instead of the three fixed display hours.
-    private func makeSeries(rows: [WeatherRow]) -> MeteogramSeries {
-        let samples = decodeWeatherSamples(rows).sorted { $0.sampleIndex < $1.sampleIndex }
+    private func makeSeries(rows: [WeatherRow], date: String) -> MeteogramSeries {
+        let samples = decodeWeatherSamples(rows)
+            .filter { $0.date == date }
+            .sorted { $0.sampleIndex < $1.sampleIndex }
         guard !samples.isEmpty else { return MeteogramSeries(time: [], limited: true) }
         let midpoint = samples[max(0, (samples.count - 1) / 2)]
-        return limitedMeteogramSeries(from: midpoint.result)
+        return limitedMeteogramSeries(from: midpoint.result, date: date, hourLimit: 48)
     }
 
     private func makeSnapshot(rows: [WeatherRow], stage: Stage, trail: Trail) -> WeatherSnapshot? {
-        let samples = decodeWeatherSamples(rows)
+        let allSamples = decodeWeatherSamples(rows)
+        guard let fallbackDate = allSamples.first?.date else { return nil }
+        let date = stageDate(date: stage.date, orderIndex: stage.orderIndex, trailStartDate: trail.startDate) ?? fallbackDate
+        let samples = allSamples.filter { $0.date == date }
         guard !samples.isEmpty else { return nil }
 
         let route = try? routeRepo.findByStage(stageId: stage.id)
@@ -103,7 +108,7 @@ final class StageWeatherViewModel {
             elevationProfile: profile,
             paceKmh: trail.defaultPaceKmh,
             startHour: startHour(preferencesJson: trail.preferences),
-            date: samples[0].date
+            date: date
         )
     }
 

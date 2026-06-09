@@ -16,17 +16,28 @@ struct TrailMapView: View {
             case .unavailable(let message):
                 ContentUnavailableView("Mapa není k dispozici", systemImage: "map", description: Text(message))
             case .loaded(let routes):
-                VStack(spacing: 0) {
-                    RouteMapView(routes: routes, interactive: true)
-                        .frame(maxHeight: .infinity)
-                    Legend(routes: routes)
-                }
-                .padding()
+                RouteMapScreen(title: "Mapa", routes: routes)
             }
         }
         .navigationTitle("Mapa")
         .navigationBarTitleDisplayMode(.inline)
         .task { model.load(trailId: trail.id, stages: stages, highlightedStageId: highlightedStageId) }
+    }
+}
+
+struct RouteMapScreen: View {
+    let title: String
+    let routes: [MapRoute]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            RouteMapView(routes: routes, interactive: true, showsCurrentLocation: true)
+                .frame(maxHeight: .infinity)
+            Legend(routes: routes)
+        }
+        .padding()
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

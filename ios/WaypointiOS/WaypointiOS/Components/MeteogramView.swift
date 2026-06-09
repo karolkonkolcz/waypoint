@@ -248,7 +248,7 @@ private struct MeteogramAxis: ViewModifier {
             .environment(\.calendar, Self.utcCalendar)
             .environment(\.timeZone, Self.utcCalendar.timeZone)
             .chartXAxis {
-                AxisMarks(values: .stride(by: .hour, count: 6)) { value in
+                AxisMarks(values: .stride(by: .hour, count: 12)) { value in
                     AxisGridLine()
                     AxisTick()
                     if showLabels {

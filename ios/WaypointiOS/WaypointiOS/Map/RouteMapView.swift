@@ -16,6 +16,7 @@ struct RouteMapView: View {
     /// Kept for source compatibility; embedded maps are non-interactive.
     var interactiveHint: Bool = false
     var interactive: Bool = false
+    var showsCurrentLocation: Bool = false
 
     var body: some View {
         if let styleURL = MapConfig.styleURL {
@@ -51,6 +52,7 @@ struct RouteMapView: View {
             mapView.allowsZooming = interactive
             mapView.allowsRotating = interactive
             mapView.allowsTilting = interactive
+            mapView.showsUserLocation = showsCurrentLocation
         }
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay {

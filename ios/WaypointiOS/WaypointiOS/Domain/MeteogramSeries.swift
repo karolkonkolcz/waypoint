@@ -95,7 +95,7 @@ func parseMeteogramDate(_ time: String) -> Date? {
 /// The daily min/max band is expanded onto the hourly X axis so the temperature
 /// panel can fill it behind the hourly line (mirrors `forecastToMeteogram` in
 /// web/lib/weather/current-position.ts).
-func forecastToMeteogram(_ forecast: RichForecast) -> MeteogramSeries {
+func forecastToMeteogram(_ forecast: RichForecast, hourLimit: Int? = nil) -> MeteogramSeries {
     let hourly = forecast.hourly
     let dates = hourly.time.map { parseMeteogramDate($0) ?? Date(timeIntervalSince1970: 0) }
 
@@ -109,7 +109,7 @@ func forecastToMeteogram(_ forecast: RichForecast) -> MeteogramSeries {
     let tempMin = hourly.time.map { dayMin[String($0.prefix(10))] ?? fallback }
     let tempMax = hourly.time.map { dayMax[String($0.prefix(10))] ?? fallback }
 
-    return MeteogramSeries(
+    let series = MeteogramSeries(
         time: dates,
         temperature: hourly.temperature2m,
         tempMin: tempMin,
@@ -125,25 +125,90 @@ func forecastToMeteogram(_ forecast: RichForecast) -> MeteogramSeries {
         windDir: hourly.windDirection10m,
         limited: false
     )
+    return hourLimit.map { series.prefixHours($0) } ?? series
 }
 
 /// Build a limited series from a cached trail-weather `OpenMeteoResult` (only
 /// temperature / precipitation / wind available). Used for the offline fallback
 /// and the stage-detail meteogram, mirroring the web "limited" mode.
-func limitedMeteogramSeries(from result: OpenMeteoResult) -> MeteogramSeries {
+func limitedMeteogramSeries(from result: OpenMeteoResult, date: String? = nil, hourLimit: Int? = nil) -> MeteogramSeries {
     let hourly = result.hourly
-    let dates = hourly.time.map { parseMeteogramDate($0) ?? Date(timeIntervalSince1970: 0) }
+    let indices = meteogramIndices(times: hourly.time, date: date, hourLimit: hourLimit)
+    let dates = indices.map { parseMeteogramDate(hourly.time[$0]) ?? Date(timeIntervalSince1970: 0) }
     return MeteogramSeries(
         time: dates,
-        temperature: hourly.temperature2m,
-        rain: hourly.precipitation,
-        windSpeed: hourly.windspeed10m,
+        temperature: hourly.temperature2m.values(at: indices),
+        rain: hourly.precipitation.values(at: indices),
+        windSpeed: hourly.windspeed10m.values(at: indices),
         limited: true
     )
+}
+
+private func meteogramIndices(times: [String], date: String?, hourLimit: Int?) -> [Int] {
+    let limit = hourLimit ?? Int.max
+    guard let date else {
+        return Array(times.indices.prefix(limit))
+    }
+    return times.indices.filter { index in
+        let offset = hourOffset(times[index], from: date)
+        return offset >= 0 && offset < limit
+    }
+}
+
+private func hourOffset(_ time: String, from date: String) -> Int {
+    let hour = Int(time.dropFirst(11).prefix(2)) ?? 0
+    guard
+        let base = utcDay(date),
+        let current = utcDay(String(time.prefix(10)))
+    else { return hour }
+    let dayOffset = Int(current.timeIntervalSince(base) / 86_400)
+    return dayOffset * 24 + hour
+}
+
+private func utcDay(_ yyyyMmDd: String) -> Date? {
+    var components = DateComponents()
+    components.calendar = Calendar(identifier: .gregorian)
+    components.timeZone = TimeZone(secondsFromGMT: 0)
+    let parts = yyyyMmDd.split(separator: "-").compactMap { Int($0) }
+    guard parts.count == 3 else { return nil }
+    components.year = parts[0]
+    components.month = parts[1]
+    components.day = parts[2]
+    return components.date
+}
+
+private extension MeteogramSeries {
+    func prefixHours(_ count: Int) -> MeteogramSeries {
+        let upperBound = min(max(count, 0), time.count)
+        return MeteogramSeries(
+            time: Array(time.prefix(upperBound)),
+            temperature: temperature?.prefixArray(upperBound),
+            tempMin: tempMin?.prefixArray(upperBound),
+            tempMax: tempMax?.prefixArray(upperBound),
+            cloudLow: cloudLow?.prefixArray(upperBound),
+            cloudMid: cloudMid?.prefixArray(upperBound),
+            cloudHigh: cloudHigh?.prefixArray(upperBound),
+            rain: rain?.prefixArray(upperBound),
+            snow: snow?.prefixArray(upperBound),
+            pressure: pressure?.prefixArray(upperBound),
+            windSpeed: windSpeed?.prefixArray(upperBound),
+            windGusts: windGusts?.prefixArray(upperBound),
+            windDir: windDir?.prefixArray(upperBound),
+            limited: limited
+        )
+    }
 }
 
 private extension Array {
     subscript(safe index: Int) -> Element? {
         indices.contains(index) ? self[index] : nil
+    }
+
+    func values(at selectedIndices: [Int]) -> [Element] {
+        selectedIndices.compactMap { self[safe: $0] }
+    }
+
+    func prefixArray(_ count: Int) -> [Element] {
+        Array(prefix(count))
     }
 }

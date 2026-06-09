@@ -76,7 +76,7 @@ final class WeatherTabViewModel: NSObject, CLLocationManagerDelegate {
             let results = try await snapshotResults
             guard let result = results.first else { throw OpenMeteoError.requestFailed }
             let snapshot = buildWeatherSnapshot(result, date: today)
-            let series = forecastToMeteogram(try await richForecast)
+            let series = forecastToMeteogram(try await richForecast, hourLimit: 48)
 
             // Reverse-geocode in background — never gates the chart
             let place = await reverseGeocode(lat: lat, lon: lon)
@@ -161,7 +161,7 @@ final class WeatherTabViewModel: NSObject, CLLocationManagerDelegate {
         let samples = decodeWeatherSamples(rows)
         guard let first = samples.first else { return nil }
         let snapshot = buildWeatherSnapshot(first.result, date: first.date)
-        let series = limitedMeteogramSeries(from: first.result)
+        let series = limitedMeteogramSeries(from: first.result, date: first.date, hourLimit: 48)
         let label = "Uložená data z etapy"
         return (snapshot, series, label)
     }

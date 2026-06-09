@@ -40,7 +40,12 @@ struct StageDetailView: View {
                 }
             }
 
-            // Terrain stats
+            WeatherSection(state: weatherModel.state) {
+                Task { await weatherModel.refresh(stage: stage, trail: trail) }
+            }
+
+            StageMapSection(stage: stage)
+
             Section("Statistiky") {
                 StatRow(label: "Vzdálenost", value: String(format: "%.1f km", stage.distanceKm), icon: "arrow.triangle.swap")
                 StatRow(label: "Převýšení ↑", value: String(format: "%.0f m", stage.ascentM), icon: "arrow.up.right")
@@ -59,12 +64,6 @@ struct StageDetailView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-
-            WeatherSection(state: weatherModel.state) {
-                Task { await weatherModel.refresh(stage: stage, trail: trail) }
-            }
-
-            StageMapSection(stage: stage)
         }
         .navigationTitle(stage.title)
         .navigationBarTitleDisplayMode(.inline)
@@ -147,8 +146,13 @@ private struct StageMapSection: View {
             case .unavailable(let message):
                 ContentUnavailableView("Mapa není k dispozici", systemImage: "map", description: Text(message))
             case .loaded(let routes):
-                RouteMapView(routes: routes, interactiveHint: true)
-                    .frame(height: 224)
+                NavigationLink {
+                    RouteMapScreen(title: stage.title, routes: routes)
+                } label: {
+                    RouteMapView(routes: routes, interactiveHint: true, showsCurrentLocation: true)
+                        .frame(height: 224)
+                }
+                .buttonStyle(.plain)
             }
         }
         .task { model.load(stage: stage) }

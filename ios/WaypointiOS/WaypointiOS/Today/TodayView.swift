@@ -137,8 +137,13 @@ private struct TodayDashboardView: View {
                 .foregroundStyle(.secondary)
 
             if let route = dashboard.route {
-                RouteMapView(routes: [route], interactiveHint: true)
-                    .frame(height: 176)
+                NavigationLink {
+                    RouteMapScreen(title: dashboard.stage.title, routes: [route])
+                } label: {
+                    RouteMapView(routes: [route], interactiveHint: true, showsCurrentLocation: true)
+                        .frame(height: 176)
+                }
+                .buttonStyle(.plain)
             } else {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(.quaternary)
