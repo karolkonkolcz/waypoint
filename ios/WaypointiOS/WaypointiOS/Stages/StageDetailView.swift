@@ -12,6 +12,8 @@ struct StageDetailView: View {
     let stage: Stage
     let trail: Trail
     @State private var weatherModel = StageWeatherViewModel()
+    @State private var routeLine: LineString?
+    private let routeRepo = RouteRepository()
 
     private var difficulty: DifficultyResult {
         stage.computedDifficulty(paceKmh: trail.defaultPaceKmh)
@@ -19,6 +21,14 @@ struct StageDetailView: View {
 
     private var etaHours: Double {
         naismithHours(distanceKm: stage.distanceKm, ascentM: stage.ascentM, paceKmh: trail.defaultPaceKmh)
+    }
+
+    private var displayTitle: String {
+        stageDisplayTitle(stage: stage, line: routeLine)
+    }
+
+    private var direction: RouteDirection? {
+        routeDirection(line: routeLine, title: stage.title)
     }
 
     var body: some View {
@@ -32,8 +42,13 @@ struct StageDetailView: View {
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
-                        Text(stage.title)
+                        Text(displayTitle)
                             .font(.title2.bold())
+                        if let direction, stage.stageType != "transit" {
+                            Label("Směr \(direction.label)", systemImage: "mappin.and.ellipse")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     Spacer()
                     DifficultyBadge(result: difficulty)
@@ -66,9 +81,12 @@ struct StageDetailView: View {
 
             StageMapSection(stage: stage)
         }
-        .navigationTitle(stage.title)
+        .navigationTitle(displayTitle)
         .navigationBarTitleDisplayMode(.inline)
-        .task { await weatherModel.load(stage: stage, trail: trail) }
+        .task {
+            loadRouteLine()
+            await weatherModel.load(stage: stage, trail: trail)
+        }
         .refreshable { await weatherModel.refresh(stage: stage, trail: trail) }
     }
 
@@ -78,6 +96,10 @@ struct StageDetailView: View {
         if h == 0 { return "\(m) min" }
         if m == 0 { return "\(h) h" }
         return "\(h) h \(m) min"
+    }
+
+    private func loadRouteLine() {
+        routeLine = (try? routeRepo.findByStage(stageId: stage.id)).flatMap { decodeLineString($0.geojson) }
     }
 }
 

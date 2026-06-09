@@ -16,8 +16,10 @@ struct TrailDetailView: View {
     @State private var addingWaypoint = false
     @State private var editingWaypoint: Waypoint?
     @State private var waypoints: [Waypoint] = []
+    @State private var routes: [Route] = []
 
     private let waypointRepo = WaypointRepository()
+    private let routeRepo = RouteRepository()
 
     private var stages: [Stage] {
         if case .loaded(let stages) = model.state { return stages }
@@ -30,8 +32,12 @@ struct TrailDetailView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar { toolbar }
             .task { await model.load(trailId: trail.id) }
+            .task { loadRoutes() }
             .task { await streamWaypoints() }
-            .refreshable { await model.load(trailId: trail.id) }
+            .refreshable {
+                await model.load(trailId: trail.id)
+                loadRoutes()
+            }
             .sheet(isPresented: $showEditTrail) {
                 TrailEditView(trail: trail)
             }
@@ -53,6 +59,16 @@ struct TrailDetailView: View {
         for await items in waypointRepo.observeByTrail(trailId: trail.id) {
             waypoints = items
         }
+    }
+
+    private func loadRoutes() {
+        routes = (try? routeRepo.findAllByTrail(trailId: trail.id)) ?? []
+    }
+
+    private func routeLine(for stage: Stage) -> LineString? {
+        routes
+            .first { $0.stageId == stage.id }
+            .flatMap { decodeLineString($0.geojson) }
     }
 
     @ToolbarContentBuilder
@@ -129,7 +145,7 @@ struct TrailDetailView: View {
                         NavigationLink {
                             StageDetailView(stage: stage, trail: trail)
                         } label: {
-                            StageRow(stage: stage, trail: trail)
+                            StageRow(stage: stage, trail: trail, routeLine: routeLine(for: stage))
                         }
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) {
@@ -209,6 +225,7 @@ extension TrailDetailView {
 private struct StageRow: View {
     let stage: Stage
     let trail: Trail
+    let routeLine: LineString?
 
     private var difficulty: DifficultyResult {
         stage.computedDifficulty(paceKmh: trail.defaultPaceKmh)
@@ -218,10 +235,18 @@ private struct StageRow: View {
         naismithHours(distanceKm: stage.distanceKm, ascentM: stage.ascentM, paceKmh: trail.defaultPaceKmh)
     }
 
+    private var displayTitle: String {
+        stageDisplayTitle(stage: stage, line: routeLine)
+    }
+
+    private var direction: RouteDirection? {
+        routeDirection(line: routeLine, title: stage.title)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(stage.title)
+                Text(displayTitle)
                     .font(.headline)
                 Spacer()
                 DifficultyBadge(result: difficulty)
@@ -244,6 +269,13 @@ private struct StageRow: View {
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            }
+
+            if let direction, stage.stageType != "transit" {
+                Label("Směr \(direction.label)", systemImage: "mappin.and.ellipse")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
         }
         .padding(.vertical, 4)

@@ -46,7 +46,8 @@ struct TodayView: View {
                 newTodoText: $model.newTodoText,
                 addTodo: model.addTodo,
                 toggleTodo: model.toggleTodo,
-                removeTodo: model.removeTodo
+                removeTodo: model.removeTodo,
+                updateStartHour: model.updateStartHour
             )
 
         case .failed(let message):
@@ -67,6 +68,7 @@ private struct TodayDashboardView: View {
     let addTodo: () -> Void
     let toggleTodo: (Todo) -> Void
     let removeTodo: (Todo) -> Void
+    let updateStartHour: (Int) -> Void
 
     private var etaHours: Double {
         naismithHours(
@@ -76,20 +78,49 @@ private struct TodayDashboardView: View {
         )
     }
 
+    private var direction: RouteDirection? {
+        routeDirection(line: dashboard.routeLine, title: dashboard.stage.title)
+    }
+
+    private var displayTitle: String {
+        stageDisplayTitle(stage: dashboard.stage, line: dashboard.routeLine)
+    }
+
+    private var timeline: (rows: [RouteTimelineRow], rain: RainOnset?, arrivalHour: Double)? {
+        guard !dashboard.elevationProfile.isEmpty else { return nil }
+        let direction = direction
+        return buildRouteTimeline(
+            profile: dashboard.elevationProfile,
+            waypoints: dashboard.waypoints,
+            paceKmh: dashboard.trail.defaultPaceKmh,
+            startHour: Double(dashboard.startHour),
+            startName: direction?.start ?? "Start",
+            destinationName: direction?.destination ?? "Cíl",
+            snapshot: dashboard.weather
+        )
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                hero
-                stats
-                weather
-                Text(dashboard.summary)
-                    .font(.body)
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.background, in: RoundedRectangle(cornerRadius: 8))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 8).stroke(.quaternary)
-                    }
+                Text(dashboard.greeting)
+                    .font(.title2.bold())
+                WeatherAlertStatusPanel()
+                summary
+                stageHeader
+                mapAndStats
+                if let timeline {
+                    RouteProfilePanel(profile: dashboard.elevationProfile, rain: timeline.rain)
+                    EtaPrecipTimelinePanel(
+                        rows: timeline.rows,
+                        startHour: dashboard.startHour,
+                        hasForecast: dashboard.weather != nil,
+                        updateStartHour: updateStartHour
+                    )
+                }
+                if let notes = dashboard.stage.notes, !notes.isEmpty {
+                    notesPanel(notes)
+                }
                 TodoPanel(
                     todos: dashboard.todos,
                     newTodoText: $newTodoText,
@@ -103,14 +134,8 @@ private struct TodayDashboardView: View {
     }
 
     @ViewBuilder
-    private var hero: some View {
+    private var mapAndStats: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(dashboard.greeting)
-                .font(.title2.bold())
-            Text(dashboard.stage.title)
-                .font(.headline)
-                .foregroundStyle(.secondary)
-
             if let route = dashboard.route {
                 RouteMapView(routes: [route], interactiveHint: true)
                     .frame(height: 176)
@@ -123,6 +148,34 @@ private struct TodayDashboardView: View {
                             .foregroundStyle(.secondary)
                     }
             }
+            stats
+        }
+    }
+
+    private var stageHeader: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let date = stageDate(
+                date: dashboard.stage.date,
+                orderIndex: dashboard.stage.orderIndex,
+                trailStartDate: dashboard.trail.startDate
+            ) {
+                Text(formatStageDate(date))
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            Text(displayTitle)
+                .font(.title2.bold())
+            if let direction {
+                Label("Směr \(direction.label)", systemImage: "mappin.and.ellipse")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.background, in: RoundedRectangle(cornerRadius: 8))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8).stroke(.quaternary)
         }
     }
 
@@ -134,30 +187,31 @@ private struct TodayDashboardView: View {
         }
     }
 
-    @ViewBuilder
-    private var weather: some View {
-        if let snapshot = dashboard.weather {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Počasí")
-                    .font(.headline)
-                HStack {
-                    if let midday = snapshot.entries.first(where: { $0.hour == 12 }) ?? snapshot.entries.first {
-                        Text("\(weatherConditionLabel(midday.condition)), \(midday.tempC) °C")
-                    }
-                    Spacer()
-                    Text("Srážky \(String(format: "%.1f mm", snapshot.precipTotalMm))")
-                        .foregroundStyle(.secondary)
-                }
-                if let hour = snapshot.rainStartsHour {
-                    Label("Déšť kolem \(String(format: "%02d:00", hour))", systemImage: "cloud.rain")
-                        .foregroundStyle(.blue)
-                }
-            }
+    private var summary: some View {
+        Text(dashboard.summary)
+            .font(.body)
             .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(.background, in: RoundedRectangle(cornerRadius: 8))
             .overlay {
                 RoundedRectangle(cornerRadius: 8).stroke(.quaternary)
             }
+    }
+
+    private func notesPanel(_ notes: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Poznámky")
+                .font(.caption.weight(.semibold))
+                .textCase(.uppercase)
+                .foregroundStyle(.secondary)
+            Text(notes)
+                .font(.subheadline)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.background, in: RoundedRectangle(cornerRadius: 8))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8).stroke(.quaternary)
         }
     }
 
@@ -167,6 +221,244 @@ private struct TodayDashboardView: View {
         if h == 0 { return "\(m) min" }
         if m == 0 { return "\(h) h" }
         return "\(h) h \(m) min"
+    }
+}
+
+private struct WeatherAlertStatusPanel: View {
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle")
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Meteorologické výstrahy")
+                    .font(.subheadline.weight(.semibold))
+                Text("Kontrola MeteoAlarm zatím není v iOS cache dostupná.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.background, in: RoundedRectangle(cornerRadius: 8))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8).stroke(.quaternary)
+        }
+    }
+}
+
+private struct RouteProfilePanel: View {
+    let profile: [ElevationPoint]
+    let rain: RainOnset?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Profil trasy")
+                    .font(.caption.weight(.semibold))
+                    .textCase(.uppercase)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if let rain {
+                    Label(String(format: "%.1f km", rain.distanceKm), systemImage: "cloud.rain")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            ElevationProfileGraph(profile: profile, rain: rain)
+                .frame(height: 142)
+        }
+        .padding()
+        .background(.background, in: RoundedRectangle(cornerRadius: 8))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8).stroke(.quaternary)
+        }
+    }
+}
+
+private struct ElevationProfileGraph: View {
+    let profile: [ElevationPoint]
+    let rain: RainOnset?
+
+    var body: some View {
+        GeometryReader { proxy in
+            let size = proxy.size
+            let maxDist = max(profile.last?.dKm ?? 0.1, 0.1)
+            let elevations = profile.map(\.eleM)
+            let minEle = elevations.min() ?? 0
+            let maxEle = elevations.max() ?? 1
+            let range = max(maxEle - minEle, 1)
+            let yMin = minEle - range * 0.12
+            let yMax = maxEle + range * 0.12
+            let yRange = max(yMax - yMin, 1)
+
+            let points = profile.map { point in
+                CGPoint(
+                    x: CGFloat(point.dKm / maxDist) * size.width,
+                    y: size.height - CGFloat((point.eleM - yMin) / yRange) * size.height
+                )
+            }
+
+            ZStack {
+                Path { path in
+                    guard let first = points.first else { return }
+                    path.move(to: CGPoint(x: first.x, y: size.height))
+                    for point in points { path.addLine(to: point) }
+                    if let last = points.last {
+                        path.addLine(to: CGPoint(x: last.x, y: size.height))
+                    }
+                    path.closeSubpath()
+                }
+                .fill(.orange.opacity(0.2))
+
+                Path { path in
+                    guard let first = points.first else { return }
+                    path.move(to: first)
+                    for point in points.dropFirst() { path.addLine(to: point) }
+                }
+                .stroke(.orange, style: StrokeStyle(lineWidth: 2, lineJoin: .round))
+
+                ForEach([0.0, 0.5, 1.0], id: \.self) { fraction in
+                    Path { path in
+                        let y = size.height * fraction
+                        path.move(to: CGPoint(x: 0, y: y))
+                        path.addLine(to: CGPoint(x: size.width, y: y))
+                    }
+                    .stroke(.quaternary, lineWidth: 1)
+                }
+
+                if let rain, let elevation = rain.elevationM {
+                    let x = CGFloat(min(max(rain.distanceKm / maxDist, 0), 1)) * size.width
+                    let y = size.height - CGFloat((Double(elevation) - yMin) / yRange) * size.height
+                    Path { path in
+                        path.move(to: CGPoint(x: x, y: 0))
+                        path.addLine(to: CGPoint(x: x, y: size.height))
+                    }
+                    .stroke(.primary, style: StrokeStyle(lineWidth: 1.2, dash: [3, 2]))
+                    Circle()
+                        .fill(.background)
+                        .stroke(.primary, lineWidth: 2)
+                        .frame(width: 10, height: 10)
+                        .position(x: x, y: y)
+                    Image(systemName: "cloud.bolt.fill")
+                        .font(.caption)
+                        .position(x: min(x + 14, size.width - 10), y: 10)
+                }
+            }
+        }
+    }
+}
+
+private struct EtaPrecipTimelinePanel: View {
+    let rows: [RouteTimelineRow]
+    let startHour: Int
+    let hasForecast: Bool
+    let updateStartHour: (Int) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Kde budeš v kolik · ETA × srážky")
+                        .font(.caption.weight(.semibold))
+                        .textCase(.uppercase)
+                        .foregroundStyle(.secondary)
+                    Text(statusText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Stepper(value: Binding(
+                    get: { startHour },
+                    set: { updateStartHour($0) }
+                ), in: 0 ... 23) {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Odchod")
+                            .font(.caption2.weight(.semibold))
+                            .textCase(.uppercase)
+                            .foregroundStyle(.secondary)
+                        Text(String(format: "%02d:00", startHour))
+                            .font(.subheadline.weight(.semibold).monospacedDigit())
+                    }
+                }
+            }
+
+            VStack(spacing: 4) {
+                ForEach(rows) { row in
+                    TimelineRow(row: row)
+                }
+            }
+        }
+        .padding()
+        .background(.background, in: RoundedRectangle(cornerRadius: 8))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8).stroke(.quaternary)
+        }
+    }
+
+    private var statusText: String {
+        guard hasForecast else { return "Počasí zatím není v cache." }
+        return rows.contains(where: \.isStorm)
+            ? "Srážkový řádek je zvýrazněný."
+            : "Po trase zatím bez významných srážek."
+    }
+}
+
+private struct TimelineRow: View {
+    let row: RouteTimelineRow
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(timeLabel(row.hour))
+                .font(.caption.monospacedDigit().weight(.semibold))
+                .frame(width: 42, alignment: .leading)
+                .foregroundStyle(row.isStorm ? .orange : .secondary)
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundStyle(row.isStorm ? .white : .secondary)
+                .frame(width: 24, height: 24)
+                .background(row.isStorm ? Color.orange : Color.secondary.opacity(0.12), in: Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(row.detail != nil && !row.isStorm ? "\(row.detail!) · \(row.title)" : row.title)
+                    .font(.subheadline.weight(row.isStorm ? .bold : .medium))
+                    .lineLimit(1)
+                Text(meta)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(row.isStorm ? Color.orange.opacity(0.14) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var meta: String {
+        var parts = [String(format: "%.1f km", row.distanceKm)]
+        if let elevation = row.elevationM { parts.append("\(elevation) m") }
+        if row.isStorm, let precip = row.precipMm { parts.append(String(format: "%.1f mm/h", precip)) }
+        return parts.joined(separator: " · ")
+    }
+
+    private var icon: String {
+        switch row.kind {
+        case .start: return "flag.fill"
+        case .water: return "drop.fill"
+        case .peak: return "mountain.2.fill"
+        case .town: return "house.fill"
+        case .camp: return "tent.fill"
+        case .shelter: return "shield.fill"
+        case .resupply: return "shippingbox.fill"
+        case .storm: return "cloud.bolt.fill"
+        case .finish: return "flag.checkered"
+        case .other: return "mappin.circle.fill"
+        }
+    }
+
+    private func timeLabel(_ hour: Double) -> String {
+        let total = Int((hour * 60).rounded())
+        let h = (total / 60) % 24
+        let m = total % 60
+        return String(format: "%02d:%02d", h, m)
     }
 }
 

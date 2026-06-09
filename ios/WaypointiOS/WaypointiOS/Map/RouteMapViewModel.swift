@@ -29,7 +29,7 @@ final class RouteMapViewModel {
                     id: route.id,
                     line: line,
                     color: mapRouteColor(for: stage.difficultyClass),
-                    title: stage.title
+                    title: stageDisplayTitle(stage: stage, line: line)
                 ),
             ])
         } catch {
@@ -48,7 +48,12 @@ final class RouteMapViewModel {
                     let color: MapRouteColor = route.stageId == highlightedStageId
                         ? .selected
                         : mapRouteColor(for: stage?.difficultyClass)
-                    return MapRoute(id: route.id, line: line, color: color, title: stage?.title)
+                    return MapRoute(
+                        id: route.id,
+                        line: line,
+                        color: color,
+                        title: stage.map { stageDisplayTitle(stage: $0, line: line) }
+                    )
                 }
 
             state = routes.isEmpty

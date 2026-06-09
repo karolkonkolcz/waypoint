@@ -49,12 +49,13 @@ struct StageEditView: View {
     private var trimmedTitle: String {
         title.trimmingCharacters(in: .whitespacesAndNewlines)
     }
+    private let routeRepo = RouteRepository()
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Etapa") {
-                    TextField("Název", text: $title)
+                    TextField(fallbackTitle(), text: $title)
                     Picker("Typ", selection: $stageType.animation()) {
                         Text("Pěší den").tag("trek")
                         Text("Přesun").tag("transit")
@@ -100,7 +101,6 @@ struct StageEditView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Uložit") { save() }
-                        .disabled(trimmedTitle.isEmpty)
                 }
             }
         }
@@ -123,10 +123,11 @@ struct StageEditView: View {
     private func save() {
         let dateIso = hasDateOverride ? isoDay(date) : nil
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        let titleToSave = trimmedTitle.isEmpty ? fallbackTitle() : trimmedTitle
         do {
             if let stage {
                 _ = try repo.update(id: stage.id) { row in
-                    row.title = trimmedTitle
+                    row.title = titleToSave
                     row.stageType = stageType
                     row.distanceKm = isTransit ? 0 : distanceKm
                     row.ascentM = isTransit ? 0 : ascentM
@@ -142,7 +143,7 @@ struct StageEditView: View {
                 _ = try repo.create(.init(
                     trailId: trailId,
                     userId: userId,
-                    title: trimmedTitle,
+                    title: titleToSave,
                     orderIndex: nextOrderIndex,
                     stageType: stageType,
                     date: dateIso,
@@ -157,5 +158,15 @@ struct StageEditView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func fallbackTitle() -> String {
+        let line = stage.flatMap { stage in
+            (try? routeRepo.findByStage(stageId: stage.id)).flatMap { decodeLineString($0.geojson) }
+        }
+        if let stage {
+            return generatedStageTitle(stage: stage, line: line, fallbackIndex: stage.orderIndex + 1)
+        }
+        return stageType == "transit" ? "Přesunový den \(nextOrderIndex + 1)" : "Den \(nextOrderIndex + 1)"
     }
 }
