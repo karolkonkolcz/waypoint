@@ -17,6 +17,8 @@ struct RouteMapView: View {
     var interactiveHint: Bool = false
     var interactive: Bool = false
     var showsCurrentLocation: Bool = false
+    /// Optional pin drawn on the route — driven by the elevation-profile scrub.
+    var highlight: Coord2? = nil
 
     var body: some View {
         if let styleURL = MapConfig.styleURL {
@@ -44,6 +46,23 @@ struct RouteMapView: View {
                     .lineWidth(route.color == .selected ? 5 : 4)
                     .lineCap(.round)
                     .lineJoin(.round)
+            }
+
+            if let highlight {
+                let point = CLLocationCoordinate2D(latitude: highlight.lat, longitude: highlight.lon)
+                let highlightSource = ShapeSource(identifier: "scrub-point") {
+                    MLNPointFeature(coordinate: point)
+                }
+                // Soft halo under a solid dot so it reads over any terrain.
+                CircleStyleLayer(identifier: "scrub-halo", source: highlightSource)
+                    .radius(13)
+                    .color(UIColor.white)
+                    .circleOpacity(0.55)
+                CircleStyleLayer(identifier: "scrub-dot", source: highlightSource)
+                    .radius(6)
+                    .color(UIColor(red: 0.95, green: 0.44, blue: 0.08, alpha: 1))
+                    .strokeWidth(2)
+                    .strokeColor(UIColor.white)
             }
         }
         .unsafeMapViewControllerModifier { controller in

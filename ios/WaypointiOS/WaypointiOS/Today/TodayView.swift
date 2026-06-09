@@ -48,10 +48,14 @@ struct TodayView: View {
         case .loaded(let dashboard):
             TodayDashboardView(
                 dashboard: dashboard,
+                alerts: model.alerts,
+                alertsLoading: model.alertsLoading,
+                updatingStartHour: model.updatingStartHour,
                 newTodoText: $model.newTodoText,
                 addTodo: model.addTodo,
                 toggleTodo: model.toggleTodo,
-                removeTodo: model.removeTodo
+                removeTodo: model.removeTodo,
+                changeStartHour: model.changeStartHour
             )
 
         case .failed(let message):
@@ -68,24 +72,56 @@ struct TodayView: View {
 
 private struct TodayDashboardView: View {
     let dashboard: TodayDashboard
+    let alerts: CachedAlerts?
+    let alertsLoading: Bool
+    let updatingStartHour: Bool
     @Binding var newTodoText: String
     let addTodo: () -> Void
     let toggleTodo: (Todo) -> Void
     let removeTodo: (Todo) -> Void
+    let changeStartHour: (Int) -> Void
 
-    private var etaHours: Double {
-        naismithHours(
-            distanceKm: dashboard.stage.distanceKm,
-            ascentM: dashboard.stage.ascentM,
-            paceKmh: dashboard.trail.defaultPaceKmh
-        )
+    /// Distance scrubbed on the elevation profile (km), nil when not touching.
+    @State private var scrubKm: Double?
+
+    private var highlightCoord: Coord2? {
+        guard let km = scrubKm, let line = dashboard.route?.line else { return nil }
+        return pointAtDistance(line, km)
     }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text(dashboard.greeting)
+                    .font(.title2.bold())
+
+                WeatherAlertBadge(
+                    alerts: alerts?.alerts ?? [],
+                    stale: alerts.map { !AlertsRepositoryFresh($0) } ?? false,
+                    loading: alertsLoading,
+                    offline: alerts == nil && alertsLoading == false,
+                    checkedAt: alerts?.fetchedAt
+                )
+
+                headerCard
+
                 hero
-                stats
+
+                if !dashboard.isTransit, dashboard.elevationProfile.count >= 2 {
+                    ElevationProfileChart(
+                        profile: dashboard.elevationProfile,
+                        rainOnset: dashboard.timeline?.rainOnset,
+                        scrubKm: $scrubKm
+                    )
+                    .padding()
+                    .background(.background, in: RoundedRectangle(cornerRadius: 16))
+                    .overlay { RoundedRectangle(cornerRadius: 16).stroke(.quaternary) }
+                }
+
+                if !dashboard.isTransit {
+                    stats
+                }
+
                 if dashboard.weather != nil {
                     NavigationLink {
                         StageDetailView(stage: dashboard.stage, trail: dashboard.trail)
@@ -96,25 +132,27 @@ private struct TodayDashboardView: View {
                 } else {
                     weather
                 }
-                Text(dashboard.summary)
-                    .font(.body)
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.background, in: RoundedRectangle(cornerRadius: 8))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 8).stroke(.quaternary)
-                    }
+
                 if let snapshot = dashboard.weather,
                    let start = snapshot.startHour,
                    let arrival = snapshot.arrivalHour,
                    snapshot.moving != nil {
                     MovingWeatherBanner(startHour: start, arrivalHour: arrival)
                         .padding()
-                        .background(.background, in: RoundedRectangle(cornerRadius: 8))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 8).stroke(.quaternary)
-                        }
+                        .background(.background, in: RoundedRectangle(cornerRadius: 16))
+                        .overlay { RoundedRectangle(cornerRadius: 16).stroke(.quaternary) }
                 }
+
+                if let timeline = dashboard.timeline, !timeline.rows.isEmpty {
+                    RouteTimelineView(
+                        timeline: timeline,
+                        startHour: dashboard.startHour,
+                        hasForecast: dashboard.weather != nil,
+                        updating: updatingStartHour,
+                        onStartHourChange: changeStartHour
+                    )
+                }
+
                 TodoPanel(
                     todos: dashboard.todos,
                     newTodoText: $newTodoText,
@@ -127,32 +165,89 @@ private struct TodayDashboardView: View {
         }
     }
 
+    // MARK: - Compact premium header
+
+    /// One card consolidating what the PWA spread across several blocks:
+    /// date · day, title, difficulty, direction and the day briefing.
+    private var headerCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(dayLine)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if !dashboard.isTransit {
+                    DifficultyBadge(result: dashboard.difficulty)
+                } else {
+                    Label("Přesunový den", systemImage: "arrow.left.arrow.right")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Text(dashboard.displayTitle)
+                .font(.title3.bold())
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let direction = dashboard.direction, direction.label != dashboard.displayTitle {
+                Label(direction.label, systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Text(emphasizedSummary)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(.background, in: RoundedRectangle(cornerRadius: 16))
+        .overlay { RoundedRectangle(cornerRadius: 16).stroke(.quaternary) }
+    }
+
+    private var dayLine: String {
+        let day = dashboard.isTransit ? nil : "Den \(dashboard.dayNumber)"
+        return [day, dashboard.dateLabel].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// Bold the difficulty word and any HH:MM in the briefing so it scans fast.
+    private var emphasizedSummary: AttributedString {
+        var attributed = AttributedString(dashboard.summary)
+        let emphasis = ["snadný", "středně náročný", "těžký", "extrémní"]
+        for word in emphasis {
+            if let range = attributed.range(of: word) {
+                attributed[range].font = .footnote.weight(.semibold)
+                attributed[range].foregroundColor = .primary
+            }
+        }
+        return attributed
+    }
+
     @ViewBuilder
     private var hero: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(dashboard.greeting)
-                .font(.title2.bold())
-            Text(dashboard.stage.title)
-                .font(.headline)
-                .foregroundStyle(.secondary)
-
-            if let route = dashboard.route {
-                NavigationLink {
-                    RouteMapScreen(title: dashboard.stage.title, routes: [route])
-                } label: {
-                    RouteMapView(routes: [route], interactiveHint: true, showsCurrentLocation: true)
-                        .frame(height: 176)
-                }
-                .buttonStyle(.plain)
-            } else {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(.quaternary)
-                    .frame(height: 120)
-                    .overlay {
-                        Label("Trasa není uložená", systemImage: "map")
-                            .foregroundStyle(.secondary)
-                    }
+        if let route = dashboard.route {
+            NavigationLink {
+                RouteMapScreen(title: dashboard.displayTitle, routes: [route])
+            } label: {
+                RouteMapView(
+                    routes: [route],
+                    interactiveHint: true,
+                    showsCurrentLocation: true,
+                    highlight: highlightCoord
+                )
+                .frame(height: 184)
             }
+            .buttonStyle(.plain)
+        } else if !dashboard.isTransit {
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.quaternary)
+                .frame(height: 120)
+                .overlay {
+                    Label("Trasa není uložená", systemImage: "map")
+                        .foregroundStyle(.secondary)
+                }
         }
     }
 
@@ -190,11 +285,18 @@ private struct TodayDashboardView: View {
                 }
             }
             .padding()
-            .background(.background, in: RoundedRectangle(cornerRadius: 8))
-            .overlay {
-                RoundedRectangle(cornerRadius: 8).stroke(.quaternary)
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.background, in: RoundedRectangle(cornerRadius: 16))
+            .overlay { RoundedRectangle(cornerRadius: 16).stroke(.quaternary) }
         }
+    }
+
+    private var etaHours: Double {
+        naismithHours(
+            distanceKm: dashboard.stage.distanceKm,
+            ascentM: dashboard.stage.ascentM,
+            paceKmh: dashboard.trail.defaultPaceKmh
+        )
     }
 
     private var formattedETA: String {
@@ -204,6 +306,11 @@ private struct TodayDashboardView: View {
         if m == 0 { return "\(h) h" }
         return "\(h) h \(m) min"
     }
+}
+
+/// Standalone freshness check so the view doesn't reach into the actor.
+private func AlertsRepositoryFresh(_ cached: CachedAlerts) -> Bool {
+    Date().timeIntervalSince(cached.fetchedAt) < 30 * 60
 }
 
 private struct StatTile: View {
@@ -221,10 +328,8 @@ private struct StatTile: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .background(.background, in: RoundedRectangle(cornerRadius: 8))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8).stroke(.quaternary)
-        }
+        .background(.background, in: RoundedRectangle(cornerRadius: 12))
+        .overlay { RoundedRectangle(cornerRadius: 12).stroke(.quaternary) }
     }
 }
 
@@ -287,9 +392,7 @@ private struct TodoPanel: View {
             }
         }
         .padding()
-        .background(.background, in: RoundedRectangle(cornerRadius: 8))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8).stroke(.quaternary)
-        }
+        .background(.background, in: RoundedRectangle(cornerRadius: 16))
+        .overlay { RoundedRectangle(cornerRadius: 16).stroke(.quaternary) }
     }
 }

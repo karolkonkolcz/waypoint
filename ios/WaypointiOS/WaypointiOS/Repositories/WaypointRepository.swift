@@ -37,6 +37,15 @@ struct WaypointRepository {
         }
     }
 
+    func findByTrail(trailId: String) throws -> [Waypoint] {
+        try db.dbPool.read { db in
+            try Waypoint
+                .filter(Column("trail_id") == trailId && Column("deleted_at") == nil)
+                .order(Column("distance_along_route_km").asc)
+                .fetchAll(db)
+        }
+    }
+
     func create(_ input: CreateInput) throws -> Waypoint {
         let now = Date()
         var row = Waypoint(
