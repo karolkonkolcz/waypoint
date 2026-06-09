@@ -31,8 +31,38 @@ extension WatchTodaySnapshot {
             precipTotalMm: dashboard.weather?.precipTotalMm,
             rainStartsHour: dashboard.weather?.rainStartsHour,
             openTodoCount: openTodos.count,
-            todoTitles: openTodos.prefix(3).map(\.text)
+            todoTitles: openTodos.prefix(3).map(\.text),
+            routeProfile: Self.makeRouteProfile(dashboard.elevationProfile),
+            timelineItems: Self.makeTimelineItems(dashboard.timeline)
         )
+    }
+
+    private static func makeRouteProfile(_ profile: [ElevationPoint]) -> [WatchRouteProfilePoint] {
+        downsample(profile, maxPoints: 28).map {
+            WatchRouteProfilePoint(distanceKm: $0.dKm, elevationM: Int($0.eleM.rounded()))
+        }
+    }
+
+    private static func makeTimelineItems(_ timeline: RouteTimeline?) -> [WatchRouteTimelineItem] {
+        guard let timeline else { return [] }
+        return timeline.rows.prefix(8).map {
+            WatchRouteTimelineItem(
+                hour: $0.hour,
+                title: $0.title,
+                detail: $0.detail,
+                distanceKm: $0.distanceKm,
+                elevationM: $0.elevationM,
+                isWeather: $0.isStorm
+            )
+        }
+    }
+
+    private static func downsample(_ profile: [ElevationPoint], maxPoints: Int) -> [ElevationPoint] {
+        guard profile.count > maxPoints, maxPoints > 2 else { return profile }
+        let step = Double(profile.count - 1) / Double(maxPoints - 1)
+        return (0 ..< maxPoints).map { index in
+            profile[Int((Double(index) * step).rounded())]
+        }
     }
 
     private static func localizedDifficulty(_ raw: String?) -> String? {

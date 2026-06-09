@@ -19,6 +19,8 @@ struct WatchTodaySnapshot: Codable, Equatable, Sendable {
     var rainStartsHour: Int?
     var openTodoCount: Int
     var todoTitles: [String]
+    var routeProfile: [WatchRouteProfilePoint]? = nil
+    var timelineItems: [WatchRouteTimelineItem]? = nil
 
     static func unavailable(title: String, subtitle: String) -> WatchTodaySnapshot {
         WatchTodaySnapshot(
@@ -39,7 +41,23 @@ struct WatchTodaySnapshot: Codable, Equatable, Sendable {
             precipTotalMm: nil,
             rainStartsHour: nil,
             openTodoCount: 0,
-            todoTitles: []
+            todoTitles: [],
+            routeProfile: [],
+            timelineItems: []
         )
     }
+}
+
+struct WatchRouteProfilePoint: Codable, Equatable, Sendable {
+    var distanceKm: Double
+    var elevationM: Int
+}
+
+struct WatchRouteTimelineItem: Codable, Equatable, Sendable {
+    var hour: Double
+    var title: String
+    var detail: String?
+    var distanceKm: Double
+    var elevationM: Int?
+    var isWeather: Bool
 }
