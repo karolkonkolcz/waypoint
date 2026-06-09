@@ -12,9 +12,17 @@
 		AA0000000000000000000014 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000013 /* GRDB */; };
 		AA0000000000000000000022 /* MapLibreSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000021 /* MapLibreSwiftUI */; };
 		AA0000000000000000000024 /* MapLibreSwiftDSL in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000023 /* MapLibreSwiftDSL */; };
+		AA000000000000000000010A /* WaypointWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000100 /* WaypointWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		AA000000000000000000010C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E1843BF92FD6ECF200766946 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA0000000000000000000106;
+			remoteInfo = WaypointWatch;
+		};
 		E1843C0F2FD6ECF400766946 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = E1843BF92FD6ECF200766946 /* Project object */;
@@ -32,12 +40,23 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		AA0000000000000000000100 /* WaypointWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WaypointWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E1843C012FD6ECF200766946 /* WaypointiOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WaypointiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E1843C0E2FD6ECF400766946 /* WaypointiOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WaypointiOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E1843C182FD6ECF400766946 /* WaypointiOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WaypointiOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		AA0000000000000000000101 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		AA0000000000000000000102 /* WaypointWatch */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = WaypointWatch;
+			sourceTree = "<group>";
+		};
 		E1843C032FD6ECF200766946 /* WaypointiOS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = WaypointiOS;
@@ -56,6 +75,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		AA0000000000000000000103 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E1843BFE2FD6ECF200766946 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -88,7 +114,9 @@
 		E1843BF82FD6ECF200766946 = {
 			isa = PBXGroup;
 			children = (
+				AA0000000000000000000101 /* Shared */,
 				E1843C032FD6ECF200766946 /* WaypointiOS */,
+				AA0000000000000000000102 /* WaypointWatch */,
 				E1843C112FD6ECF400766946 /* WaypointiOSTests */,
 				E1843C1B2FD6ECF400766946 /* WaypointiOSUITests */,
 				E1843C022FD6ECF200766946 /* Products */,
@@ -99,6 +127,7 @@
 			isa = PBXGroup;
 			children = (
 				E1843C012FD6ECF200766946 /* WaypointiOS.app */,
+				AA0000000000000000000100 /* WaypointWatch.app */,
 				E1843C0E2FD6ECF400766946 /* WaypointiOSTests.xctest */,
 				E1843C182FD6ECF400766946 /* WaypointiOSUITests.xctest */,
 			);
@@ -107,7 +136,44 @@
 		};
 /* End PBXGroup section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		AA000000000000000000010B /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				AA000000000000000000010A /* WaypointWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXNativeTarget section */
+		AA0000000000000000000106 /* WaypointWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA0000000000000000000109 /* Build configuration list for PBXNativeTarget "WaypointWatch" */;
+			buildPhases = (
+				AA0000000000000000000105 /* Sources */,
+				AA0000000000000000000103 /* Frameworks */,
+				AA0000000000000000000104 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AA0000000000000000000101 /* Shared */,
+				AA0000000000000000000102 /* WaypointWatch */,
+			);
+			name = WaypointWatch;
+			packageProductDependencies = (
+			);
+			productName = WaypointWatch;
+			productReference = AA0000000000000000000100 /* WaypointWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
 		E1843C002FD6ECF200766946 /* WaypointiOS */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = E1843C222FD6ECF400766946 /* Build configuration list for PBXNativeTarget "WaypointiOS" */;
@@ -115,12 +181,15 @@
 				E1843BFD2FD6ECF200766946 /* Sources */,
 				E1843BFE2FD6ECF200766946 /* Frameworks */,
 				E1843BFF2FD6ECF200766946 /* Resources */,
+				AA000000000000000000010B /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				AA000000000000000000010D /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
+				AA0000000000000000000101 /* Shared */,
 				E1843C032FD6ECF200766946 /* WaypointiOS */,
 			);
 			name = WaypointiOS;
@@ -191,6 +260,9 @@
 				LastSwiftUpdateCheck = 2650;
 				LastUpgradeCheck = 2650;
 				TargetAttributes = {
+					AA0000000000000000000106 = {
+						CreatedOnToolsVersion = 26.5;
+					};
 					E1843C002FD6ECF200766946 = {
 						CreatedOnToolsVersion = 26.5;
 					};
@@ -224,6 +296,7 @@
 			projectRoot = "";
 			targets = (
 				E1843C002FD6ECF200766946 /* WaypointiOS */,
+				AA0000000000000000000106 /* WaypointWatch */,
 				E1843C0D2FD6ECF400766946 /* WaypointiOSTests */,
 				E1843C172FD6ECF400766946 /* WaypointiOSUITests */,
 			);
@@ -231,6 +304,13 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		AA0000000000000000000104 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E1843BFF2FD6ECF200766946 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -255,6 +335,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		AA0000000000000000000105 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E1843BFD2FD6ECF200766946 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -279,6 +366,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		AA000000000000000000010D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA0000000000000000000106 /* WaypointWatch */;
+			targetProxy = AA000000000000000000010C /* PBXContainerItemProxy */;
+		};
 		E1843C102FD6ECF400766946 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = E1843C002FD6ECF200766946 /* WaypointiOS */;
@@ -292,6 +384,71 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		AA0000000000000000000107 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WP48MC25PW;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Waypoint;
+				INFOPLIST_KEY_WKApplication = YES;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.karolkonkol.WaypointiOS;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.karolkonkol.WaypointiOS.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.5;
+			};
+			name = Debug;
+		};
+		AA0000000000000000000108 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WP48MC25PW;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Waypoint;
+				INFOPLIST_KEY_WKApplication = YES;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.karolkonkol.WaypointiOS;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.karolkonkol.WaypointiOS.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 26.5;
+			};
+			name = Release;
+		};
 		E1843C202FD6ECF400766946 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -568,6 +725,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		AA0000000000000000000109 /* Build configuration list for PBXNativeTarget "WaypointWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0000000000000000000107 /* Debug */,
+				AA0000000000000000000108 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		E1843BFC2FD6ECF200766946 /* Build configuration list for PBXProject "WaypointiOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

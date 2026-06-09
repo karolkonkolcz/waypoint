@@ -8,6 +8,7 @@ struct WaypointiOSApp: App {
         // Warm up the database (runs migrations if needed) and kick off the
         // first sync pull — both happen before the first frame renders.
         _ = AppDatabase.shared
+        WatchSessionBridge.shared.start()
         SyncEngine.shared.start()
     }
 

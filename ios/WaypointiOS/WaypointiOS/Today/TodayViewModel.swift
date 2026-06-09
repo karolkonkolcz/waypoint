@@ -66,6 +66,10 @@ final class TodayViewModel {
                 stageCountByTrail: try stageCounts(for: trails),
                 today: localToday()
             ) else {
+                WatchSessionBridge.shared.send(snapshot: .unavailable(
+                    title: hello,
+                    subtitle: "Zatím nemáš žádnou trasu."
+                ))
                 state = .empty(hello)
                 return
             }
@@ -74,6 +78,10 @@ final class TodayViewModel {
             guard let todayStage = stages.first(where: {
                 stageDate(date: $0.date, orderIndex: $0.orderIndex, trailStartDate: activeTrail.startDate) == localToday()
             }) else {
+                WatchSessionBridge.shared.send(snapshot: .unavailable(
+                    title: activeTrail.name,
+                    subtitle: "Na dnešek není naplánovaná žádná etapa."
+                ))
                 state = .noStage(greeting: hello, trail: activeTrail)
                 return
             }
@@ -127,6 +135,7 @@ final class TodayViewModel {
                 weatherPoint: weatherPoint(stage: todayStage, line: line),
                 isTransit: isTransit
             )
+            WatchSessionBridge.shared.send(snapshot: WatchTodaySnapshot(dashboard: dashboard))
             state = .loaded(dashboard)
         } catch {
             state = .failed(error.localizedDescription)

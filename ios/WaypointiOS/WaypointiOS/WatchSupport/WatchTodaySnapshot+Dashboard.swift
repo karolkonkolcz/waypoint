@@ -1,0 +1,47 @@
+import Foundation
+
+extension WatchTodaySnapshot {
+    init(dashboard: TodayDashboard) {
+        let etaHours = naismithHours(
+            distanceKm: dashboard.stage.distanceKm,
+            ascentM: dashboard.stage.ascentM,
+            paceKmh: dashboard.trail.defaultPaceKmh
+        )
+        let midday = dashboard.weather?.entries.first(where: { $0.hour == 12 })
+            ?? dashboard.weather?.entries.first
+        let openTodos = dashboard.todos
+            .filter { !$0.done }
+            .sorted { $0.orderIndex < $1.orderIndex }
+
+        self.init(
+            generatedAt: Date(),
+            isAvailable: true,
+            title: dashboard.stage.title,
+            subtitle: dashboard.greeting,
+            trailName: dashboard.trail.name,
+            stageType: dashboard.stage.stageType,
+            distanceKm: dashboard.stage.distanceKm,
+            ascentM: dashboard.stage.ascentM,
+            descentM: dashboard.stage.descentM,
+            etaMinutes: Int((etaHours * 60).rounded()),
+            difficultyLabel: Self.localizedDifficulty(dashboard.stage.difficultyClass),
+            summary: dashboard.summary,
+            weatherCondition: midday.map { weatherConditionLabel($0.condition) },
+            temperatureC: midday?.tempC,
+            precipTotalMm: dashboard.weather?.precipTotalMm,
+            rainStartsHour: dashboard.weather?.rainStartsHour,
+            openTodoCount: openTodos.count,
+            todoTitles: openTodos.prefix(3).map(\.text)
+        )
+    }
+
+    private static func localizedDifficulty(_ raw: String?) -> String? {
+        switch raw?.lowercased() {
+        case "easy": return "Snadné"
+        case "moderate": return "Střední"
+        case "hard": return "Těžké"
+        case "extreme": return "Extrémní"
+        default: return nil
+        }
+    }
+}
