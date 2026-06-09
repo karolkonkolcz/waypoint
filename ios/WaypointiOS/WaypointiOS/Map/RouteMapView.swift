@@ -31,7 +31,7 @@ struct RouteMapView: View {
             styleURL: styleURL,
             camera: .constant(initialCamera)
         ) {
-            ForEach(Array(routes.enumerated()), id: \.offset) { index, route in
+            for (index, route) in routes.enumerated() {
                 let coords = route.line.coordinates.map {
                     CLLocationCoordinate2D(latitude: $0[1], longitude: $0[0])
                 }

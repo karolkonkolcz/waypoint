@@ -306,6 +306,48 @@ onboarding, welcome screen.
 
 ---
 
+## 11. Local build & test workflow (agentic / CLI)
+
+Builds and tests run through the **`ios/WaypointiOS/Makefile`**, not raw
+`xcodebuild` invocations. It is tuned for driving the build from a CLI agent on
+Apple Silicon (validated on an Air M2 / 16 GB) and exists to avoid three failure
+modes that previously stalled sessions and overheated the machine:
+
+1. **Cold simulator boot every run.** `make boot` boots *one* `iPhone 17`
+   simulator and reuses it. Booting on demand inside `xcodebuild test` was the
+   main cause of multi-minute "hangs".
+2. **Full rebuild every run.** Targets split `build-for-testing` from
+   `test-without-building` against a **fixed `DerivedData` at `.build/`**
+   (gitignored), so the second phase is incremental instead of compiling from
+   scratch.
+3. **Invisible/blocking output.** Output streams through `xcbeautify` (readable
+   progress, no `| tail` that only prints at EOF), and `xcodebuild` is wrapped in
+   `gtimeout` so a stuck run dies instead of hanging the session.
+
+**One-time setup:** `brew install xcbeautify coreutils` (the Makefile degrades
+gracefully if either is missing — raw output, no timeout).
+
+**Targets** (`make help` lists them):
+
+| Command          | What it does                                            |
+| ---------------- | ------------------------------------------------------- |
+| `make test`      | Everyday loop: boot + incremental build + run tests     |
+| `make build`     | Incremental `build-for-testing` only                    |
+| `make test-only` | Run tests against the current binary (skips compile)    |
+| `make run`       | Build & launch the app in the simulator                 |
+| `make clean`     | Drop the `.build/` cache (forces a full rebuild)        |
+
+Conventions:
+
+- All targets pass `-skipMacroValidation` (MapLibre's Swift macro requires it
+  in non-interactive builds).
+- **Quit GUI Xcode while these run.** Two concurrent compiles (GUI indexing +
+  CLI build) on 8 cores is the main source of thermal throttling.
+- An allowlist for `make` / `xcodebuild` / `xcrun simctl` lives in
+  `.claude/settings.json` (gitignored, personal) to cut permission prompts.
+
+---
+
 *This file pairs with `AGENTS.md`, `PRD.md`, and `ARCHITECTURE.md`. Keep all four
 in the repo root. `ARCHITECTURE.md` wins on schema, sync semantics, and domain
 math; this file wins on iOS-specific structure.*

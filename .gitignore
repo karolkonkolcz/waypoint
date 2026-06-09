@@ -13,6 +13,7 @@
 ios/build/
 ios/**/build/
 ios/DerivedData/
+ios/**/.build/
 ios/**/xcuserdata/
 ios/**/*.xcuserstate
 ios/.swiftpm/
