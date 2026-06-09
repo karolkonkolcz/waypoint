@@ -82,6 +82,12 @@ final class TodayViewModel {
                     title: activeTrail.name,
                     subtitle: "Na dnešek není naplánovaná žádná etapa."
                 ))
+                WatchSessionBridge.shared.send(overview: WatchTrailOverview.build(
+                    trail: activeTrail,
+                    stages: stages,
+                    todayStageId: nil,
+                    routeRepo: routeRepo
+                ))
                 state = .noStage(greeting: hello, trail: activeTrail)
                 return
             }
@@ -136,6 +142,12 @@ final class TodayViewModel {
                 isTransit: isTransit
             )
             WatchSessionBridge.shared.send(snapshot: WatchTodaySnapshot(dashboard: dashboard))
+            WatchSessionBridge.shared.send(overview: WatchTrailOverview.build(
+                trail: activeTrail,
+                stages: stages,
+                todayStageId: todayStage.id,
+                routeRepo: routeRepo
+            ))
             state = .loaded(dashboard)
         } catch {
             state = .failed(error.localizedDescription)
@@ -181,6 +193,11 @@ final class TodayViewModel {
 
         guard upgraded != direction, case .loaded(var current) = state else { return }
         current.direction = upgraded
+        // The timeline ("Kde budeš v kolik") baked in the coordinate labels at
+        // build time; relabel its endpoints so they track the upgraded names.
+        current.timeline = current.timeline?.relabelEndpoints(
+            start: upgraded.start, destination: upgraded.destination
+        )
         state = .loaded(current)
     }
 

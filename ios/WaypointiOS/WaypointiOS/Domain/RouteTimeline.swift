@@ -37,6 +37,20 @@ struct RouteTimeline: Sendable {
     var rows: [RouteTimelineRow]
     var rainOnset: RainOnset?
     var arrivalHour: Double
+
+    /// Replace the start/finish row titles. Used after the direction's
+    /// coordinate labels are upgraded to place names post-load, so the timeline
+    /// doesn't keep showing raw "lat, lon".
+    func relabelEndpoints(start: String, destination: String) -> RouteTimeline {
+        var copy = self
+        copy.rows = rows.map { row in
+            var r = row
+            if r.kind == .start { r.title = start }
+            if r.kind == .finish { r.title = destination }
+            return r
+        }
+        return copy
+    }
 }
 
 private let rainThresholdMm = 0.5

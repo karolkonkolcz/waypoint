@@ -17,7 +17,9 @@ actor PlaceNameService {
 
     private let geocoder = CLGeocoder()
     private let defaults = UserDefaults.standard
-    private let cacheKey = "placeNameCache.v1"
+    // v2: bumped after fixing candidate priority (v1 cached municipality/county
+    // names like "Gusinje"/"Shkodër" instead of the local "Vusanje"/"Theth").
+    private let cacheKey = "placeNameCache.v2"
     private var cache: [String: String]
     /// Coordinates that produced no usable name this session — don't retry them.
     private var negative: Set<String> = []
@@ -56,15 +58,30 @@ actor PlaceNameService {
 
     private func bestName(from placemark: CLPlacemark?) -> String? {
         guard let placemark else { return nil }
-        // Prefer the most specific human anchor a hiker would recognise.
+        // Order matters: in sparse / foreign trail areas `locality` resolves to
+        // the *municipality* or *county* (e.g. "Gusinje", "Shkodër") — a town
+        // tens of km away. The nearest named feature (`name`) and the village
+        // (`subLocality`) are the anchors a hiker actually recognises, so they
+        // come first. `administrativeArea` (region) is never useful and is dropped.
         let candidates = [
-            placemark.locality,        // town / village
-            placemark.subLocality,     // district / quarter
-            placemark.name.flatMap { $0.rangeOfCharacter(from: .decimalDigits) == nil ? $0 : nil },
-            placemark.subAdministrativeArea,
-            placemark.administrativeArea,
+            cleanedFeatureName(placemark.name),  // nearest named place / feature
+            placemark.subLocality,               // village / quarter
+            placemark.locality,                  // town / municipality
+            placemark.subAdministrativeArea,     // district
         ]
         return candidates.compactMap { $0 }.first { !$0.isEmpty }
+    }
+
+    /// Trims a feature name to its leading component and rejects street-address
+    /// forms. "Vusanje - Ropojanska dolina" → "Vusanje"; "Theth" → "Theth";
+    /// "Hlavní 25" → nil (digits). A bare hyphen ("Frýdek-Místek") is preserved.
+    private func cleanedFeatureName(_ raw: String?) -> String? {
+        guard let raw, raw.rangeOfCharacter(from: .decimalDigits) == nil else { return nil }
+        let head = raw.components(separatedBy: CharacterSet(charactersIn: ",(")).first ?? raw
+        let trimmed = head
+            .replacingOccurrences(of: #"\s+[–—-]\s+.*$"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
 
