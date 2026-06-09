@@ -12,6 +12,7 @@ import { routeRepo } from '@/lib/db/repositories/route.repo';
 import { weatherRepo } from '@/lib/db/repositories/weather.repo';
 import { alertsRepo } from '@/lib/db/repositories/alerts.repo';
 import { todoRepo } from '@/lib/db/repositories/todo.repo';
+import { waypointRepo } from '@/lib/db/repositories/waypoint.repo';
 import { db } from '@/lib/db/dexie';
 import { createClient } from '@/lib/supabase/client';
 import { getLocalSessionUser } from '@/lib/auth/session';
@@ -25,13 +26,16 @@ import { formatHours } from '@/lib/format/hours';
 import { getGreeting } from '@/lib/domain/greeting';
 import { buildDaySummary } from '@/lib/domain/daySummary';
 import { resolveActiveTrail } from '@/lib/domain/activeTrail';
+import { stageDirection, stageDisplayTitle } from '@/lib/domain/routeDirection';
+import { buildRouteTimeline } from '@/lib/domain/routeTimeline';
 
 import type { MapRoute } from '@/components/map/MapView';
 import { DIFFICULTY_LINE_COLOR, DEFAULT_LINE_COLOR } from '@/components/map/colors';
 import type { DifficultyClass } from '@/lib/domain/difficulty';
 import { StageHeader } from '@/components/stage/StageHeader';
 import { WeatherAlertBadge } from '@/components/weather/WeatherAlertBadge';
-import { MovingForecast } from '@/components/dashboard/MovingForecast';
+import { RouteProfilePanel } from '@/components/dashboard/RouteProfilePanel';
+import { EtaPrecipTimeline } from '@/components/dashboard/EtaPrecipTimeline';
 import { TodoList } from '@/components/dashboard/TodoList';
 import { Eyebrow } from '@/components/ui/primitives';
 
@@ -59,7 +63,7 @@ function nextDay(date: string): string {
 /** Day start hour for ETA projection — trail preference, default 08:00. */
 function getStartHour(preferences: Record<string, unknown>): number {
   const v = preferences?.start_hour;
-  return typeof v === 'number' && v >= 0 && v <= 23 ? v : 8;
+  return typeof v === 'number' && v >= 0 && v < 24 ? v : 8;
 }
 
 export default function TodayPage() {
@@ -74,9 +78,6 @@ export default function TodayPage() {
     getLocalSessionUser().then(async (user) => {
       if (!user) return;
       setUserId(user.id);
-      const emailName = user.email?.split('@')[0] ?? '';
-      setName(emailName);
-
       if (!navigator.onLine) return;
       const supabase = createClient();
       try {
@@ -87,7 +88,7 @@ export default function TodayPage() {
           .maybeSingle();
         if (data?.display_name) setName(data.display_name);
       } catch {
-        // Keep the local email fallback when the profile lookup cannot reach Supabase.
+        // No display name available: keep the greeting without an address.
       }
     });
   }, []);
@@ -142,8 +143,15 @@ export default function TodayPage() {
     () => (activeTrail ? todoRepo.findByTrail(activeTrail.id) : Promise.resolve([])),
     [activeTrail?.id],
   );
+  const waypoints = useLiveQuery(
+    () => (activeTrail ? waypointRepo.findByTrail(activeTrail.id) : Promise.resolve([])),
+    [activeTrail?.id],
+  );
 
   const [fetchingWeather, setFetchingWeather] = useState(false);
+  const [fetchingAlerts, setFetchingAlerts] = useState(false);
+  const [savingStartHour, setSavingStartHour] = useState(false);
+  const startHour = activeTrail ? getStartHour(activeTrail.preferences) : 8;
 
   // Where to sample weather: a trek day uses its route midpoint; a transit day
   // uses its optional location anchor. null = can't sample.
@@ -167,13 +175,15 @@ export default function TodayPage() {
   // forecast; transit days / route-less days sample the single anchor point.
   useEffect(() => {
     if (!todayStage || !activeTrail) return;
-    if (cachedWeather !== undefined && weatherRepo.isFresh(cachedWeather)) return;
     if (typeof navigator !== 'undefined' && !navigator.onLine) return;
 
     const targetDate = stageDate(todayStage, activeTrail.start_date);
     if (!targetDate) return;
 
     const isTrekWithRoute = todayStage.stage_type !== 'transit' && !!route;
+    const cachedSnapshot = cachedWeather?.forecast_json as WeatherSnapshot | undefined;
+    const cacheMatchesStart = !isTrekWithRoute || cachedSnapshot?.startHour === startHour;
+    if (cachedWeather !== undefined && weatherRepo.isFresh(cachedWeather) && cacheMatchesStart) return;
 
     if (isTrekWithRoute && route) {
       const points = samplePoints(route.geojson, 6).map(([lon, lat]) => ({ lat, lon }));
@@ -195,7 +205,7 @@ export default function TodayPage() {
               route: route.geojson,
               elevationProfile: route.elevation_profile,
               paceKmh: activeTrail.default_pace_kmh,
-              startHour: getStartHour(activeTrail.preferences),
+              startHour,
               date: targetDate,
             }),
           }),
@@ -227,10 +237,29 @@ export default function TodayPage() {
     activeTrail?.id,
     activeTrail?.start_date,
     activeTrail?.default_pace_kmh,
+    startHour,
     route?.id,
     weatherPoint,
     cachedWeather?.fetched_at,
   ]);
+
+  // MeteoAlarm warnings for today's stage. Keep the panel visible even for an
+  // empty result so it doubles as an API health check for hikers.
+  useEffect(() => {
+    if (!activeTrail || !weatherPoint) return;
+    if (cachedAlerts && alertsRepo.isFresh(cachedAlerts)) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+
+    const { lat, lon } = weatherPoint;
+    setFetchingAlerts(true);
+    fetch(`/api/alerts?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data) return alertsRepo.save(activeTrail.id, data.country, data.alerts);
+      })
+      .catch(() => {})
+      .finally(() => setFetchingAlerts(false));
+  }, [activeTrail?.id, weatherPoint, cachedAlerts?.fetched_at]);
 
   const mapRoutes: MapRoute[] = useMemo(() => {
     if (!route) return [];
@@ -270,15 +299,59 @@ export default function TodayPage() {
   const isTransit = todayStage.stage_type === 'transit';
   const eta = formatHours(naismithHours(todayStage.distance_km, todayStage.ascent_m, activeTrail.default_pace_kmh));
   const summary = buildDaySummary({ stage: todayStage, snapshot });
+  const direction = todayStage && route ? stageDirection(todayStage, route) : null;
+  const displayTitle = stageDisplayTitle(todayStage, route);
+  const stageIndex = stages?.findIndex((s) => s.id === todayStage.id) ?? -1;
+  const trekDayNumber =
+    stageIndex >= 0
+      ? stages!.slice(0, stageIndex + 1).filter((s) => s.stage_type !== 'transit').length
+      : todayStage.order_index + 1;
+  const timeline = route
+    ? buildRouteTimeline({
+        profile: route.elevation_profile,
+        waypoints: waypoints ?? [],
+        paceKmh: activeTrail.default_pace_kmh,
+        startHour,
+        startName: direction?.start ?? 'Start',
+        destinationName: direction?.destination ?? 'Cíl',
+        snapshot,
+      })
+    : null;
+
+  async function handleStartHourChange(nextHour: number) {
+    if (!activeTrail) return;
+    setSavingStartHour(true);
+    try {
+      await trailRepo.update(activeTrail.id, {
+        preferences: { ...activeTrail.preferences, start_hour: nextHour },
+      });
+    } finally {
+      setSavingStartHour(false);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-lg space-y-6 px-4 pt-4">
-      {/* Block 1 — Map hero (trek) or header (transit) */}
+      <h1 className="text-2xl font-bold leading-tight">{getGreeting(new Date(), name)}</h1>
+
+      <WeatherAlertBadge
+        alerts={cachedAlerts?.alerts ?? []}
+        stale={cachedAlerts ? !alertsRepo.isFresh(cachedAlerts) : false}
+        showEmpty
+        loading={fetchingAlerts && !cachedAlerts}
+        checkedAt={cachedAlerts?.fetched_at ?? null}
+        offline={typeof navigator !== 'undefined' && !navigator.onLine && !cachedAlerts}
+      />
+
+      {/* Route description — keep the deterministic one-line briefing prominent. */}
+      <p className="rounded-2xl border bg-card p-3 text-base leading-snug">
+        {emphasizeSummary(summary)}
+      </p>
+
       {isTransit ? (
         <div className="rounded-2xl border bg-card p-4">
-          <p className="mb-2 text-xl font-bold">{getGreeting(new Date(), name)}</p>
           <StageHeader
-            title={todayStage.title}
+            title={displayTitle}
             dayNumber={0}
             date={stageDate(todayStage, activeTrail.start_date)}
             difficultyClass={null}
@@ -293,7 +366,23 @@ export default function TodayPage() {
           )}
         </div>
       ) : (
-        <div>
+        <>
+          <section className="rounded-2xl border bg-card p-4">
+            <StageHeader
+              title={displayTitle}
+              dayNumber={trekDayNumber}
+              date={stageDate(todayStage, activeTrail.start_date)}
+              difficultyClass={todayStage.difficulty_class as DifficultyClass | null}
+              difficultyScore={todayStage.difficulty_score}
+            />
+            {direction && (
+              <p className="mt-3 flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                <MapPinIcon className="h-4 w-4" />
+                Směr {direction.label}
+              </p>
+            )}
+          </section>
+
           <Link
             href={`/trails/${activeTrail.id}/map?stage=${todayStage.id}`}
             className="relative block h-44 overflow-hidden rounded-2xl border bg-card"
@@ -308,11 +397,6 @@ export default function TodayPage() {
             <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/30 to-transparent" />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/45 to-transparent" />
 
-            {/* Greeting overlay */}
-            <span className="absolute left-2 top-2 rounded-lg bg-card/85 px-2.5 py-1 text-base font-bold backdrop-blur">
-              {getGreeting(new Date(), name)}
-            </span>
-
             {/* Tap affordance — the hero opens today's stage on the map. */}
             <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-card/85 px-2.5 py-1 text-[11px] font-semibold backdrop-blur">
               <MapIcon className="h-3 w-3" />
@@ -321,7 +405,7 @@ export default function TodayPage() {
 
             {/* Route name */}
             <span className="absolute inset-x-3 bottom-2 truncate text-base font-bold text-white drop-shadow">
-              {todayStage.title}
+              {displayTitle}
             </span>
           </Link>
 
@@ -338,25 +422,8 @@ export default function TodayPage() {
             <StatTileCard value={`+${todayStage.ascent_m} m`} label="Stoupání" />
             <StatTileCard value={eta} label="ETA" />
           </div>
-        </div>
+        </>
       )}
-
-      {/* Block 2 — Moving forecast */}
-      {snapshot ? (
-        <MovingForecast snapshot={snapshot} loading={fetchingWeather} />
-      ) : fetchingWeather ? (
-        <div className="h-24 animate-pulse rounded-2xl bg-muted" />
-      ) : null}
-
-      {/* Weather warnings */}
-      {cachedAlerts && cachedAlerts.alerts.length > 0 && (
-        <WeatherAlertBadge alerts={cachedAlerts.alerts} stale={!alertsRepo.isFresh(cachedAlerts)} />
-      )}
-
-      {/* Block 3 — One-line summary, with difficulty + times emphasised */}
-      <p className="rounded-2xl border bg-card p-3 text-base leading-snug">
-        {emphasizeSummary(summary)}
-      </p>
 
       {/* Block 3.5 — Stage notes (date-aware via todayStage) */}
       {todayStage.notes && (
@@ -364,6 +431,22 @@ export default function TodayPage() {
           <Eyebrow className="mb-2 block">Poznámky</Eyebrow>
           <p className="whitespace-pre-wrap text-sm leading-relaxed">{todayStage.notes}</p>
         </section>
+      )}
+
+      {!isTransit && timeline && (
+        <>
+          <RouteProfilePanel
+            profile={route?.elevation_profile ?? []}
+            rainOnset={timeline.rainOnset}
+          />
+          <EtaPrecipTimeline
+            rows={timeline.rows}
+            startHour={startHour}
+            onStartHourChange={handleStartHourChange}
+            hasForecast={!!snapshot}
+            updating={savingStartHour || fetchingWeather}
+          />
+        </>
       )}
 
       {/* Block 4 — To-do list */}

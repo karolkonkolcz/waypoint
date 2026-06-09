@@ -2,6 +2,7 @@ import { parseGPXTracks, type ParsedTrack } from './parse';
 import { trailRepo } from '@/lib/db/repositories/trail.repo';
 import { stageRepo } from '@/lib/db/repositories/stage.repo';
 import { routeRepo, type CreateRouteInput } from '@/lib/db/repositories/route.repo';
+import { routeDirectionFromLine } from '@/lib/domain/routeDirection';
 
 export interface TrekPreview {
   /** Suggested trail name (from file name). */
@@ -69,10 +70,11 @@ export async function importTrek(
 
   for (let i = 0; i < tracks.length; i++) {
     const t = tracks[i];
+    const generatedTitle = routeDirectionFromLine(t.geojson, t.name)?.label ?? `Den ${i + 1}`;
     const stage = await stageRepo.create({
       trail_id: trail.id,
       user_id: opts.userId,
-      title: t.name ?? `Den ${i + 1}`,
+      title: t.name?.trim() || generatedTitle,
       order_index: i,
       distance_km: t.total_distance_km,
       ascent_m: t.total_ascent_m,

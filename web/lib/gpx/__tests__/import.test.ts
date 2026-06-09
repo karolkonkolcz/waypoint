@@ -80,11 +80,15 @@ describe('importTrek', () => {
     expect(await routeRepo.findByTrail(trailId)).toBeUndefined();
   });
 
-  it('falls back to Den N titles when tracks are unnamed', async () => {
+  it('falls back to direction titles when tracks are unnamed', async () => {
     const noNames = TREK.replace(/Deň \d/g, '');
     const tracks = parseGPXTracks(noNames);
     const { trailId } = await importTrek(tracks, { userId: USER, trailName: 'X' });
     const stages = await stageRepo.findByTrail(trailId);
-    expect(stages.map((s) => s.title)).toEqual(['Den 1', 'Den 2', 'Den 3']);
+    expect(stages.map((s) => s.title)).toEqual([
+      '42.0000, 9.0000 → 42.0100, 9.0100',
+      '42.1000, 9.1000 → 42.1100, 9.1100',
+      '42.2000, 9.2000 → 42.2100, 9.2100',
+    ]);
   });
 });

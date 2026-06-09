@@ -1,6 +1,6 @@
 'use client';
 
-import { TriangleAlertIcon } from 'lucide-react';
+import { CheckCircle2Icon, Loader2Icon, TriangleAlertIcon, WifiOffIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { WeatherAlert, AlertSeverity } from '@/lib/alerts/meteoalarm';
 
@@ -15,10 +15,44 @@ const SEVERITY_STYLE: Record<AlertSeverity, string> = {
 interface Props {
   alerts: WeatherAlert[];
   stale?: boolean;
+  showEmpty?: boolean;
+  loading?: boolean;
+  checkedAt?: string | null;
+  offline?: boolean;
 }
 
-export function WeatherAlertBadge({ alerts, stale }: Props) {
-  if (alerts.length === 0) return null;
+export function WeatherAlertBadge({ alerts, stale, showEmpty, loading, checkedAt, offline }: Props) {
+  if (alerts.length === 0 && !showEmpty) return null;
+
+  if (alerts.length === 0) {
+    return (
+      <div className="rounded-2xl border bg-card px-3 py-3">
+        <div className="flex items-start gap-2">
+          {loading ? (
+            <Loader2Icon className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-primary" />
+          ) : offline ? (
+            <WifiOffIcon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+          ) : (
+            <CheckCircle2Icon className="mt-0.5 h-4 w-4 shrink-0 text-[#1c7c43]" />
+          )}
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">
+              {loading
+                ? 'Kontroluji meteorologické výstrahy'
+                : offline
+                  ? 'Výstrahy bez aktuální kontroly'
+                  : 'Bez aktivních meteorologických výstrah'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {checkedAt
+                ? `MeteoAlarm kontrolován ${formatWhen(checkedAt)}${stale ? ' · cache může být starší' : ''}`
+                : 'Panel zůstává viditelný pro kontrolu MeteoAlarm API.'}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2">

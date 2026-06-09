@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { trailRepo } from '@/lib/db/repositories/trail.repo';
 import { stageRepo } from '@/lib/db/repositories/stage.repo';
+import { routeRepo } from '@/lib/db/repositories/route.repo';
 import { uploadTrailCover } from '@/lib/storage/covers';
 import { DifficultyBadge } from '@/components/difficulty/DifficultyBadge';
 import { AlertDialog } from '@/components/ui/alert-dialog';
@@ -27,8 +28,9 @@ import type { DifficultyClass } from '@/lib/domain/difficulty';
 import { naismithHours } from '@/lib/domain/eta';
 import { sortMilestones } from '@/components/stage/StageTimeline';
 import { stageDate, formatStageDate } from '@/lib/domain/stageDate';
+import { stageDirection, stageDisplayTitle } from '@/lib/domain/routeDirection';
 import { cn } from '@/lib/utils';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { TrailRow, Milestone, StageType } from '@/lib/db/dexie';
 
 /** One-line summary of a transit day's timeline for the stage list. */
@@ -62,6 +64,11 @@ export default function TrailPage() {
 
   const trail = useLiveQuery(() => trailRepo.findById(trailId), [trailId]);
   const stages = useLiveQuery(() => stageRepo.findByTrail(trailId), [trailId]);
+  const routes = useLiveQuery(() => routeRepo.findAllByTrail(trailId), [trailId]);
+  const routeByStage = useMemo(
+    () => new Map((routes ?? []).filter((r) => r.stage_id).map((r) => [r.stage_id as string, r])),
+    [routes],
+  );
 
   const totalDistanceKm = stages?.reduce((sum, s) => sum + s.distance_km, 0) ?? 0;
   const totalAscentM = stages?.reduce((sum, s) => sum + s.ascent_m, 0) ?? 0;
@@ -168,6 +175,9 @@ export default function TrailPage() {
 
           {stages.map((stage, idx) => {
             const cd = stageDate(stage, trail.start_date);
+            const route = routeByStage.get(stage.id);
+            const displayTitle = stageDisplayTitle(stage, route, idx + 1);
+            const direction = route ? stageDirection(stage, route) : null;
             const summary =
               stage.stage_type === 'transit'
                 ? transitSummary(stage.timeline)
@@ -187,10 +197,15 @@ export default function TrailPage() {
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{stage.title}</p>
+                    <p className="truncate font-medium">{displayTitle}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {cd ? `${formatStageDate(cd)} · ${summary}` : summary}
                     </p>
+                    {direction && stage.stage_type !== 'transit' && (
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                        Směr {direction.label}
+                      </p>
+                    )}
                   </div>
                   {stage.difficulty_class && (
                     <DifficultyBadge klass={stage.difficulty_class as DifficultyClass} size="sm" />

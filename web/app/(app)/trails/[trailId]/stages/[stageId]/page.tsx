@@ -23,6 +23,7 @@ import { DifficultyBadge } from '@/components/difficulty/DifficultyBadge';
 import type { DifficultyClass } from '@/lib/domain/difficulty';
 import { naismithHours } from '@/lib/domain/eta';
 import { formatHours } from '@/lib/format/hours';
+import { generatedStageTitle, stageDirection, stageDisplayTitle } from '@/lib/domain/routeDirection';
 import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/db/dexie';
 import dynamic from 'next/dynamic';
@@ -166,6 +167,8 @@ export default function StagePage() {
     .slice(0, stageIndex + 1)
     .filter((s) => s.stage_type !== 'transit').length;
   const stageCalendarDate = stageDate(stage, trail.start_date);
+  const displayTitle = stageDisplayTitle(stage, route, stageIndex + 1);
+  const direction = route ? stageDirection(stage, route) : null;
 
   const stats = [
     { label: 'Vzdálenost', value: `${stage.distance_km} km`, icon: '↔' },
@@ -189,13 +192,19 @@ export default function StagePage() {
       {/* Stage header */}
       <div className="mb-6">
         <StageHeader
-          title={stage.title}
+          title={displayTitle}
           dayNumber={trekDayNumber}
           date={stageCalendarDate}
           difficultyClass={stage.difficulty_class as DifficultyClass | null}
           difficultyScore={stage.difficulty_score}
           stageType={stage.stage_type}
         />
+        {direction && !isTransit && (
+          <p className="mt-3 flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+            <MapPinIcon className="h-4 w-4" />
+            Směr {direction.label}
+          </p>
+        )}
       </div>
 
       {/* Transit day — editable day timeline is the focus */}
@@ -317,7 +326,7 @@ export default function StagePage() {
         isTransit ? (
           <TransitEditForm stage={stage} onDone={() => setEditing(false)} />
         ) : (
-          <EditStageForm stage={stage} onDone={() => setEditing(false)} />
+          <EditStageForm stage={stage} route={route} fallbackIndex={stageIndex + 1} onDone={() => setEditing(false)} />
         )
       ) : (
         <button
@@ -367,8 +376,8 @@ export default function StagePage() {
         title="Smazat etapu?"
         description={
           isTransit
-            ? `"${stage.title}" a její časová osa budou trvale smazány.`
-            : `"${stage.title}" a její trasa budou trvale smazány.`
+            ? `"${displayTitle}" a její časová osa budou trvale smazány.`
+            : `"${displayTitle}" a její trasa budou trvale smazány.`
         }
         confirmLabel="Smazat"
         cancelLabel="Zrušit"
@@ -399,9 +408,13 @@ function DifficultyBar({ score }: { score: number }) {
 
 function EditStageForm({
   stage,
+  route,
+  fallbackIndex,
   onDone,
 }: {
   stage: NonNullable<Awaited<ReturnType<typeof stageRepo.findById>>>;
+  route: Awaited<ReturnType<typeof routeRepo.findByStage>> | undefined;
+  fallbackIndex: number;
   onDone: () => void;
 }) {
   const [pending, setPending] = useState(false);
@@ -410,8 +423,9 @@ function EditStageForm({
     e.preventDefault();
     setPending(true);
     const fd = new FormData(e.currentTarget);
+    const title = (fd.get('title') as string).trim() || generatedStageTitle(stage, route, fallbackIndex);
     await stageRepo.update(stage.id, {
-      title: (fd.get('title') as string).trim(),
+      title,
       date: (fd.get('date') as string) || null,
       distance_km: parseFloat(fd.get('distance_km') as string),
       ascent_m: parseInt(fd.get('ascent_m') as string, 10),
@@ -429,8 +443,7 @@ function EditStageForm({
       <input
         name="title"
         defaultValue={stage.title}
-        required
-        placeholder="Název etapy"
+        placeholder={generatedStageTitle(stage, route, fallbackIndex)}
         className="input"
       />
       <div className="space-y-1">
