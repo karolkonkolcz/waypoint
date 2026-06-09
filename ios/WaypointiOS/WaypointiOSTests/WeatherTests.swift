@@ -19,9 +19,14 @@ struct WeatherSnapshotTests {
             ElevationPoint(dKm: 0, eleM: 0),
             ElevationPoint(dKm: totalDistance(route), eleM: 0),
         ]
+        // ~22 km flat route at 5 km/h → ETA ≈ 4.45 h, arrival at 13:00; moving
+        // phase is 8..13. Weather en route is read from the NEAREST sample to the
+        // projected position, so the hiker only starts reading the far (wet)
+        // sample once past the halfway crossover (~km 11.1) — that's hour 11
+        // (km ≈ 15). Putting rain there is the first hour the journey gets wet.
         let dry = makeResult(lon: 0, precipitation: Array(repeating: 0, count: 48))
         var wetPrecip = Array(repeating: 0.0, count: 48)
-        wetPrecip[10] = 1.2
+        wetPrecip[11] = 1.2
         let wet = makeResult(lon: 0.2, precipitation: wetPrecip)
         let samples = [
             WeatherSampleCache(sampleIndex: 0, distanceKm: 0, date: "2026-06-05", result: dry),
@@ -38,7 +43,7 @@ struct WeatherSnapshotTests {
         )
 
         #expect(snapshot?.startHour == 8)
-        #expect(snapshot?.rainStartsHour == 10)
+        #expect(snapshot?.rainStartsHour == 11)
         #expect((snapshot?.rainStartsKm ?? 0) > 0)
     }
 }
