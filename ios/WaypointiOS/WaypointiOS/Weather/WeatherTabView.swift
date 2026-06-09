@@ -11,8 +11,8 @@ final class WeatherTabViewModel: NSObject, CLLocationManagerDelegate {
         case idle
         case locating
         case fetching(lat: Double, lon: Double)
-        case loaded(snapshot: WeatherSnapshot, place: String?, fetchedAt: Date)
-        case offlineFallback(snapshot: WeatherSnapshot, label: String)
+        case loaded(snapshot: WeatherSnapshot, series: MeteogramSeries, place: String?, fetchedAt: Date)
+        case offlineFallback(snapshot: WeatherSnapshot, series: MeteogramSeries, label: String)
         case failed(String)
     }
 
@@ -63,17 +63,23 @@ final class WeatherTabViewModel: NSObject, CLLocationManagerDelegate {
 
         let today = localToday()
         do {
-            let results = try await client.fetch(
+            // Fetch the summary snapshot (condition/current temp) and the richer
+            // meteogram forecast concurrently — both hit the same free API.
+            async let snapshotResults = client.fetch(
                 points: [Coord2(lat: lat, lon: lon)],
                 date: today,
                 endDate: nil
             )
+            async let richForecast = client.fetchRich(lat: lat, lon: lon)
+
+            let results = try await snapshotResults
             guard let result = results.first else { throw OpenMeteoError.requestFailed }
             let snapshot = buildWeatherSnapshot(result, date: today)
+            let series = forecastToMeteogram(try await richForecast)
 
             // Reverse-geocode in background — never gates the chart
             let place = await reverseGeocode(lat: lat, lon: lon)
-            state = .loaded(snapshot: snapshot, place: place, fetchedAt: Date())
+            state = .loaded(snapshot: snapshot, series: series, place: place, fetchedAt: Date())
         } catch {
             await resolveOffline(reason: "Nepodařilo se načíst počasí.")
         }
@@ -141,21 +147,22 @@ final class WeatherTabViewModel: NSObject, CLLocationManagerDelegate {
 
     private func resolveOffline(reason: String) async {
         // Try to serve most-recent stage weather from GRDB as offline fallback
-        if let (snapshot, label) = offlineFallback() {
-            state = .offlineFallback(snapshot: snapshot, label: label)
+        if let (snapshot, series, label) = offlineFallback() {
+            state = .offlineFallback(snapshot: snapshot, series: series, label: label)
         } else {
             state = .failed(reason)
         }
     }
 
-    private func offlineFallback() -> (WeatherSnapshot, String)? {
+    private func offlineFallback() -> (WeatherSnapshot, MeteogramSeries, String)? {
         guard let rows = try? mostRecentWeatherRows(),
               !rows.isEmpty else { return nil }
         let samples = decodeWeatherSamples(rows)
         guard let first = samples.first else { return nil }
         let snapshot = buildWeatherSnapshot(first.result, date: first.date)
+        let series = limitedMeteogramSeries(from: first.result)
         let label = "Uložená data z etapy"
-        return (snapshot, label)
+        return (snapshot, series, label)
     }
 
     private func mostRecentWeatherRows() throws -> [WeatherRow] {
@@ -205,12 +212,12 @@ struct WeatherTabView: View {
         case .idle, .locating, .fetching:
             loadingView
 
-        case .loaded(let snapshot, let place, let fetchedAt):
+        case .loaded(let snapshot, let series, let place, let fetchedAt):
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     headerRow(snapshot: snapshot, place: place)
                     weatherSummaryCard(snapshot: snapshot, fetchedAt: fetchedAt, isOffline: false)
-                    MeteogramView(entries: snapshot.entries)
+                    MeteogramView(series: series)
                         .padding()
                         .background(.background, in: RoundedRectangle(cornerRadius: 12))
                         .overlay { RoundedRectangle(cornerRadius: 12).stroke(.quaternary) }
@@ -218,7 +225,7 @@ struct WeatherTabView: View {
                 .padding()
             }
 
-        case .offlineFallback(let snapshot, let label):
+        case .offlineFallback(let snapshot, let series, let label):
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Label(label, systemImage: "wifi.slash")
@@ -226,7 +233,7 @@ struct WeatherTabView: View {
                         .foregroundStyle(.secondary)
                         .padding(.horizontal)
                     weatherSummaryCard(snapshot: snapshot, fetchedAt: Date.distantPast, isOffline: true)
-                    MeteogramView(entries: snapshot.entries)
+                    MeteogramView(series: series)
                         .padding()
                         .background(.background, in: RoundedRectangle(cornerRadius: 12))
                         .overlay { RoundedRectangle(cornerRadius: 12).stroke(.quaternary) }

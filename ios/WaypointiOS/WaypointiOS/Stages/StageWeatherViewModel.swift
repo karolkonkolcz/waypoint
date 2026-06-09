@@ -7,7 +7,7 @@ final class StageWeatherViewModel {
         case idle
         case loading
         case unavailable(String)
-        case loaded(WeatherSnapshot, fetchedAt: Date, isStale: Bool, isRefreshing: Bool, message: String?)
+        case loaded(WeatherSnapshot, series: MeteogramSeries, fetchedAt: Date, isStale: Bool, isRefreshing: Bool, message: String?)
     }
 
     var state: State = .idle
@@ -21,7 +21,7 @@ final class StageWeatherViewModel {
         let isFresh = weatherRepo.isFresh(cached)
 
         if let snapshot = makeSnapshot(rows: cached, stage: stage, trail: trail), let fetchedAt = cached.map(\.fetchedAt).max() {
-            state = .loaded(snapshot, fetchedAt: fetchedAt, isStale: !isFresh, isRefreshing: !isFresh, message: nil)
+            state = .loaded(snapshot, series: makeSeries(rows: cached), fetchedAt: fetchedAt, isStale: !isFresh, isRefreshing: !isFresh, message: nil)
         } else {
             state = .loading
         }
@@ -32,8 +32,8 @@ final class StageWeatherViewModel {
 
     func refresh(stage: Stage, trail: Trail) async {
         switch state {
-        case .loaded(let snapshot, let fetchedAt, let isStale, _, let message):
-            state = .loaded(snapshot, fetchedAt: fetchedAt, isStale: isStale, isRefreshing: true, message: message)
+        case .loaded(let snapshot, let series, let fetchedAt, let isStale, _, let message):
+            state = .loaded(snapshot, series: series, fetchedAt: fetchedAt, isStale: isStale, isRefreshing: true, message: message)
         default:
             state = .loading
         }
@@ -65,19 +65,29 @@ final class StageWeatherViewModel {
 
             let rows = try weatherRepo.saveSamples(inputs)
             if let snapshot = makeSnapshot(rows: rows, stage: stage, trail: trail), let fetchedAt = rows.map(\.fetchedAt).max() {
-                state = .loaded(snapshot, fetchedAt: fetchedAt, isStale: false, isRefreshing: false, message: nil)
+                state = .loaded(snapshot, series: makeSeries(rows: rows), fetchedAt: fetchedAt, isStale: false, isRefreshing: false, message: nil)
             } else {
                 state = .unavailable("Počasí se nepodařilo uložit.")
             }
         } catch {
             let message = errorMessage(error)
             switch state {
-            case .loaded(let snapshot, let fetchedAt, let isStale, _, _):
-                state = .loaded(snapshot, fetchedAt: fetchedAt, isStale: isStale, isRefreshing: false, message: message)
+            case .loaded(let snapshot, let series, let fetchedAt, let isStale, _, _):
+                state = .loaded(snapshot, series: series, fetchedAt: fetchedAt, isStale: isStale, isRefreshing: false, message: message)
             default:
                 state = .unavailable(message)
             }
         }
+    }
+
+    /// Limited hourly series (temperature / precipitation / wind) from the
+    /// midpoint sample's raw forecast — drives the stage-detail meteogram with
+    /// real hourly data instead of the three fixed display hours.
+    private func makeSeries(rows: [WeatherRow]) -> MeteogramSeries {
+        let samples = decodeWeatherSamples(rows).sorted { $0.sampleIndex < $1.sampleIndex }
+        guard !samples.isEmpty else { return MeteogramSeries(time: [], limited: true) }
+        let midpoint = samples[max(0, (samples.count - 1) / 2)]
+        return limitedMeteogramSeries(from: midpoint.result)
     }
 
     private func makeSnapshot(rows: [WeatherRow], stage: Stage, trail: Trail) -> WeatherSnapshot? {

@@ -43,6 +43,61 @@ struct WeatherSnapshotTests {
     }
 }
 
+@Suite("MeteogramSeries")
+struct MeteogramSeriesTests {
+    @Test func decodesRichForecastAndFillsEveryPanel() throws {
+        let json = """
+        {
+          "latitude": 50.0, "longitude": 14.0,
+          "hourly": {
+            "time": ["2026-06-09T00:00", "2026-06-09T01:00"],
+            "temperature_2m": [12.0, 13.0],
+            "cloud_cover_low": [10, 20],
+            "cloud_cover_mid": [30, 40],
+            "cloud_cover_high": [50, 60],
+            "rain": [0.0, 1.5],
+            "snowfall": [0.0, 0.0],
+            "pressure_msl": [1012, 1011],
+            "wind_speed_10m": [5, 7],
+            "wind_gusts_10m": [9, 12],
+            "wind_direction_10m": [180, 200]
+          },
+          "daily": {
+            "time": ["2026-06-09"],
+            "temperature_2m_max": [18.0],
+            "temperature_2m_min": [9.0]
+          }
+        }
+        """
+        let forecast = try JSONDecoder().decode(RichForecast.self, from: Data(json.utf8))
+        let series = forecastToMeteogram(forecast)
+
+        #expect(series.time.count == 2)
+        #expect(series.limited == false)
+        #expect(series.temperature == [12.0, 13.0])
+        #expect(series.cloudHigh == [50, 60])
+        #expect(series.rain == [0.0, 1.5])
+        #expect(series.pressure == [1012, 1011])
+        #expect(series.windGusts == [9, 12])
+        // Daily band expanded onto every hourly slot of that day.
+        #expect(series.tempMin == [9.0, 9.0])
+        #expect(series.tempMax == [18.0, 18.0])
+    }
+
+    @Test func limitedSeriesFillsOnlyTempPrecipWind() {
+        let result = makeResult(precipitation: [0, 0.4, 0])
+        let series = limitedMeteogramSeries(from: result)
+
+        #expect(series.limited)
+        #expect(series.time.count == 3)
+        #expect(series.temperature == [18, 18, 18])
+        #expect(series.rain == [0, 0.4, 0])
+        #expect(series.windSpeed == [12, 12, 12])
+        #expect(series.cloudLow == nil)
+        #expect(series.pressure == nil)
+    }
+}
+
 private func makeResult(
     lat: Double = 50,
     lon: Double = 14,

@@ -106,10 +106,9 @@ private struct WeatherSection: View {
                     Button("Zkusit znovu", action: refresh)
                 }
 
-            case .loaded(let snapshot, let fetchedAt, let isStale, let isRefreshing, let message):
+            case .loaded(let snapshot, let series, let fetchedAt, let isStale, let isRefreshing, let message):
                 WeatherSummary(snapshot: snapshot, fetchedAt: fetchedAt, isStale: isStale, isRefreshing: isRefreshing)
-                MeteogramView(entries: snapshot.entries)
-                    .frame(height: 190)
+                MeteogramView(series: series)
                     .padding(.vertical, 6)
                 if let hour = snapshot.rainStartsHour, let km = snapshot.rainStartsKm {
                     Label("Déšť kolem \(formatHour(hour)), přibližně na \(String(format: "%.1f km", km))", systemImage: "cloud.rain")
