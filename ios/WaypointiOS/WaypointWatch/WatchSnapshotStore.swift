@@ -4,13 +4,17 @@ import WatchConnectivity
 
 final class WatchSnapshotStore: NSObject, ObservableObject {
     @Published private(set) var snapshot: WatchTodaySnapshot?
+    @Published private(set) var overview: WatchTrailOverview?
 
     private let snapshotKey = "todaySnapshot"
-    private let defaultsKey = "WaypointWatchTodaySnapshot"
+    private let overviewKey = "trailOverview"
+    private let snapshotDefaultsKey = "WaypointWatchTodaySnapshot"
+    private let overviewDefaultsKey = "WaypointWatchTrailOverview"
 
     override init() {
-        snapshot = Self.loadCachedSnapshot(defaultsKey: defaultsKey)
         super.init()
+        snapshot = Self.loadCached(defaultsKey: snapshotDefaultsKey)
+        overview = Self.loadCached(defaultsKey: overviewDefaultsKey)
     }
 
     func start() {
@@ -20,20 +24,25 @@ final class WatchSnapshotStore: NSObject, ObservableObject {
     }
 
     private func receive(_ context: [String: Any]) {
-        guard
-            let data = context[snapshotKey] as? Data,
-            let snapshot = try? JSONDecoder.watchSnapshot.decode(WatchTodaySnapshot.self, from: data)
-        else { return }
-
-        DispatchQueue.main.async {
-            self.snapshot = snapshot
-            UserDefaults.standard.set(data, forKey: self.defaultsKey)
+        if let data = context[snapshotKey] as? Data,
+           let value = try? JSONDecoder.watchSnapshot.decode(WatchTodaySnapshot.self, from: data) {
+            DispatchQueue.main.async {
+                self.snapshot = value
+                UserDefaults.standard.set(data, forKey: self.snapshotDefaultsKey)
+            }
+        }
+        if let data = context[overviewKey] as? Data,
+           let value = try? JSONDecoder.watchSnapshot.decode(WatchTrailOverview.self, from: data) {
+            DispatchQueue.main.async {
+                self.overview = value
+                UserDefaults.standard.set(data, forKey: self.overviewDefaultsKey)
+            }
         }
     }
 
-    private static func loadCachedSnapshot(defaultsKey: String) -> WatchTodaySnapshot? {
+    private static func loadCached<T: Decodable>(defaultsKey: String) -> T? {
         guard let data = UserDefaults.standard.data(forKey: defaultsKey) else { return nil }
-        return try? JSONDecoder.watchSnapshot.decode(WatchTodaySnapshot.self, from: data)
+        return try? JSONDecoder.watchSnapshot.decode(T.self, from: data)
     }
 }
 

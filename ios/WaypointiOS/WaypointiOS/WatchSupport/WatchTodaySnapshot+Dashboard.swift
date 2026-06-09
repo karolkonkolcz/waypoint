@@ -32,6 +32,7 @@ extension WatchTodaySnapshot {
             rainStartsHour: dashboard.weather?.rainStartsHour,
             openTodoCount: openTodos.count,
             todoTitles: openTodos.prefix(3).map(\.text),
+            dayNumber: dashboard.isTransit ? nil : dashboard.dayNumber,
             routeProfile: Self.makeRouteProfile(dashboard.elevationProfile),
             timelineItems: Self.makeTimelineItems(dashboard.timeline)
         )
@@ -65,7 +66,7 @@ extension WatchTodaySnapshot {
         }
     }
 
-    private static func localizedDifficulty(_ raw: String?) -> String? {
+    static func localizedDifficulty(_ raw: String?) -> String? {
         switch raw?.lowercased() {
         case "easy": return "Snadné"
         case "moderate": return "Střední"

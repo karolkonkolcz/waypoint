@@ -6,7 +6,7 @@ struct WaypointWatchApp: App {
 
     var body: some Scene {
         WindowGroup {
-            WatchTodayView(snapshot: store.snapshot)
+            WatchTodayView(snapshot: store.snapshot, overview: store.overview)
                 .task { store.start() }
         }
     }

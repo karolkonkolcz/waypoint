@@ -39,6 +39,20 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		AA000000000000000000010B /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				AA000000000000000000010A /* WaypointWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		AA0000000000000000000100 /* WaypointWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WaypointWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E1843C012FD6ECF200766946 /* WaypointiOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WaypointiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -135,20 +149,6 @@
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-		AA000000000000000000010B /* Embed Watch Content */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
-			dstSubfolderSpec = 16;
-			files = (
-				AA000000000000000000010A /* WaypointWatch.app in Embed Watch Content */,
-			);
-			name = "Embed Watch Content";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXNativeTarget section */
 		AA0000000000000000000106 /* WaypointWatch */ = {

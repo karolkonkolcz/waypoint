@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WatchTodayView: View {
     let snapshot: WatchTodaySnapshot?
+    var overview: WatchTrailOverview? = nil
     @State private var page = 1
 
     var body: some View {
@@ -31,6 +32,20 @@ struct WatchTodayView: View {
                 }
             }
             .navigationTitle("Dnes")
+            .toolbar {
+                if let day = snapshot?.dayNumber {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Text("D\(day)")
+                            .font(.caption2.weight(.bold))
+                            .monospacedDigit()
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.orange, in: Capsule())
+                            .accessibilityLabel("Den \(day)")
+                    }
+                }
+            }
         }
     }
 
@@ -75,6 +90,16 @@ struct WatchTodayView: View {
                             .lineLimit(2)
                     }
                 }
+            }
+
+            if let overview, overview.stages.count > 1 {
+                NavigationLink {
+                    WatchStageListView(overview: overview)
+                } label: {
+                    Label("Všechny etapy (\(overview.stages.count))", systemImage: "list.bullet")
+                        .font(.caption.weight(.semibold))
+                }
+                .padding(.top, 2)
             }
         }
         .padding(.horizontal, 2)
@@ -128,22 +153,39 @@ struct WatchTodayView: View {
                 if items.isEmpty {
                     emptyPage("Timeline se ukáže po uložení profilu trasy.")
                 } else {
-                    ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                        HStack(alignment: .top, spacing: 7) {
-                            Text(formatClock(item.hour))
-                                .font(.caption.monospacedDigit().weight(.semibold))
-                                .frame(width: 38, alignment: .leading)
+                    ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                        HStack(alignment: .top, spacing: 8) {
+                            VStack(spacing: 0) {
+                                Circle()
+                                    .fill(item.isWeather ? Color.orange : Color.secondary)
+                                    .frame(width: 6, height: 6)
+                                if index < items.count - 1 {
+                                    Rectangle()
+                                        .fill(Color.secondary.opacity(0.3))
+                                        .frame(width: 1.5)
+                                        .frame(maxHeight: .infinity)
+                                }
+                            }
+                            .padding(.top, 4)
 
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(item.title)
-                                    .font(.caption.weight(.semibold))
-                                    .lineLimit(2)
+                                HStack(spacing: 6) {
+                                    Text(formatClock(item.hour))
+                                        .font(.caption.monospacedDigit().weight(.semibold))
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.85)
+                                    Text(item.title)
+                                        .font(.caption.weight(.semibold))
+                                        .lineLimit(2)
+                                }
                                 Text(timelineDetail(item))
                                     .font(.caption2)
                                     .foregroundStyle(item.isWeather ? .orange : .secondary)
                                     .lineLimit(2)
                             }
+                            .padding(.bottom, index < items.count - 1 ? 8 : 0)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
@@ -176,17 +218,29 @@ struct WatchTodayView: View {
             }
             HStack(spacing: 6) {
                 metric("+m", value: snapshot.ascentM.map { String(format: "%.0f", $0) })
-                metric("Obtížnost", value: snapshot.difficultyLabel)
+                metric("Obtížnost", value: snapshot.difficultyLabel, tint: difficultyColor(snapshot.difficultyLabel))
             }
         }
     }
 
-    private func metric(_ label: String, value: String?) -> some View {
+    private func difficultyColor(_ label: String?) -> Color {
+        switch label {
+        case "Snadné": return .green
+        case "Střední": return .yellow
+        case "Těžké": return .orange
+        case "Extrémní": return .red
+        default: return .primary
+        }
+    }
+
+    private func metric(_ label: String, value: String?, tint: Color = .primary) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(value ?? "-")
                 .font(.caption.weight(.semibold))
                 .monospacedDigit()
+                .foregroundStyle(tint)
                 .lineLimit(1)
+                .minimumScaleFactor(0.8)
             Text(label)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -267,7 +321,7 @@ struct WatchTodayView: View {
     }
 }
 
-private struct RouteProfileChart: View {
+struct RouteProfileChart: View {
     let points: [WatchRouteProfilePoint]
 
     var body: some View {
@@ -279,7 +333,13 @@ private struct RouteProfileChart: View {
 
             ZStack(alignment: .bottomLeading) {
                 profileArea(size: size, minElevation: minElevation, maxElevation: maxElevation, distance: distance)
-                    .fill(.orange.opacity(0.16))
+                    .fill(
+                        LinearGradient(
+                            colors: [.orange.opacity(0.30), .orange.opacity(0.04)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
                 profileLine(size: size, minElevation: minElevation, maxElevation: maxElevation, distance: distance)
                     .stroke(.orange, style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
             }
@@ -359,6 +419,7 @@ private struct RouteProfileChart: View {
         rainStartsHour: 15,
         openTodoCount: 2,
         todoTitles: ["Doplnit vodu", "Koupit plyn"],
+        dayNumber: 2,
         routeProfile: [
             .init(distanceKm: 0, elevationM: 1220),
             .init(distanceKm: 4, elevationM: 1580),

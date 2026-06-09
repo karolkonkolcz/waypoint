@@ -6,7 +6,13 @@ final class WatchSessionBridge: NSObject {
     static let shared = WatchSessionBridge()
 
     private let snapshotKey = "todaySnapshot"
-    private var pendingSnapshot: WatchTodaySnapshot?
+    private let overviewKey = "trailOverview"
+
+    /// Latest merged application context (both payloads live here so a second
+    /// `updateApplicationContext` call never clobbers the first).
+    private var latestContext: [String: Any] = [:]
+    /// The most recent single payload, re-sent via `transferUserInfo` for reliability.
+    private var pendingUserInfo: [String: Any]?
 
     private override init() {
         super.init()
@@ -19,25 +25,33 @@ final class WatchSessionBridge: NSObject {
     }
 
     func send(snapshot: WatchTodaySnapshot) {
-        guard WCSession.isSupported() else { return }
-        pendingSnapshot = snapshot
-        sendPendingSnapshotIfPossible()
+        guard let data = try? JSONEncoder.watchSnapshot.encode(snapshot) else { return }
+        stage(key: snapshotKey, data: data)
     }
 
-    private func sendPendingSnapshotIfPossible() {
+    func send(overview: WatchTrailOverview) {
+        guard let data = try? JSONEncoder.watchSnapshot.encode(overview) else { return }
+        stage(key: overviewKey, data: data)
+    }
+
+    private func stage(key: String, data: Data) {
+        guard WCSession.isSupported() else { return }
+        latestContext[key] = data
+        pendingUserInfo = [key: data]
+        flush()
+    }
+
+    private func flush() {
         guard
-            let snapshot = pendingSnapshot,
             WCSession.default.activationState == .activated,
             WCSession.default.isWatchAppInstalled,
-            let data = try? JSONEncoder.watchSnapshot.encode(snapshot)
+            !latestContext.isEmpty
         else { return }
 
-        do {
-            try WCSession.default.updateApplicationContext([snapshotKey: data])
-            WCSession.default.transferUserInfo([snapshotKey: data])
-            pendingSnapshot = nil
-        } catch {
-            WCSession.default.transferUserInfo([snapshotKey: data])
+        try? WCSession.default.updateApplicationContext(latestContext)
+        if let info = pendingUserInfo {
+            WCSession.default.transferUserInfo(info)
+            pendingUserInfo = nil
         }
     }
 }
@@ -49,7 +63,7 @@ extension WatchSessionBridge: WCSessionDelegate {
         error: Error?
     ) {
         Task { @MainActor in
-            self.sendPendingSnapshotIfPossible()
+            self.flush()
         }
     }
 

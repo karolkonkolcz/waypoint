@@ -19,6 +19,7 @@ struct WatchTodaySnapshot: Codable, Equatable, Sendable {
     var rainStartsHour: Int?
     var openTodoCount: Int
     var todoTitles: [String]
+    var dayNumber: Int? = nil
     var routeProfile: [WatchRouteProfilePoint]? = nil
     var timelineItems: [WatchRouteTimelineItem]? = nil
 
@@ -42,6 +43,7 @@ struct WatchTodaySnapshot: Codable, Equatable, Sendable {
             rainStartsHour: nil,
             openTodoCount: 0,
             todoTitles: [],
+            dayNumber: nil,
             routeProfile: [],
             timelineItems: []
         )
