@@ -55,6 +55,7 @@ final class TodayViewModel {
         reloadFromLocal()
         await refreshAlerts()
         await enrichDirection()
+        await enrichWatchOverview()
     }
 
     func reloadFromLocal() {
@@ -199,6 +200,47 @@ final class TodayViewModel {
             start: upgraded.start, destination: upgraded.destination
         )
         state = .loaded(current)
+        // The watch snapshot was sent during reloadFromLocal() with the raw
+        // coordinate labels; resend it now that the names are resolved.
+        WatchSessionBridge.shared.send(snapshot: WatchTodaySnapshot(dashboard: current))
+    }
+
+    /// The watch overview's stage browser shows a "Start → Cíl" title per stage.
+    /// Stages without their own title fall back to a coordinate label, which —
+    /// unlike the iOS screen — is never enriched. Resolve those to place names
+    /// (cached) and resend the overview so the watch matches the phone.
+    func enrichWatchOverview() async {
+        guard case .loaded(let dashboard) = state,
+              let stages = try? stageRepo.findByTrail(trailId: dashboard.trail.id),
+              !stages.isEmpty
+        else { return }
+
+        var overview = WatchTrailOverview.build(
+            trail: dashboard.trail, stages: stages,
+            todayStageId: dashboard.stage.id, routeRepo: routeRepo
+        )
+        var changed = false
+        for index in overview.stages.indices {
+            let summary = overview.stages[index]
+            let parts = summary.title
+                .components(separatedBy: "→")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+            guard parts.count == 2, parts.allSatisfy(isCoordinateLabel),
+                  let first = summary.routePolyline.first, let last = summary.routePolyline.last,
+                  first.count >= 2, last.count >= 2
+            else { continue }
+
+            async let start = PlaceNameService.shared.name(lat: first[1], lon: first[0])
+            async let dest = PlaceNameService.shared.name(lat: last[1], lon: last[0])
+            let resolvedStart = await start ?? parts[0]
+            let resolvedDest = await dest ?? parts[1]
+            let upgraded = "\(resolvedStart) → \(resolvedDest)"
+            if upgraded != summary.title {
+                overview.stages[index].title = upgraded
+                changed = true
+            }
+        }
+        if changed { WatchSessionBridge.shared.send(overview: overview) }
     }
 
     func addTodo() {
