@@ -58,6 +58,10 @@ final class AuthViewModel {
     func signOut() async {
         await run {
             try await auth.signOut()
+            // Local-first: the SQLite cache outlives the session, so wipe it (and the
+            // watch's cached snapshots) or the next account would inherit these trails.
+            try await AppDatabase.shared.eraseAllData()
+            WatchSessionBridge.shared.clear()
             step = .enterEmail
         }
     }

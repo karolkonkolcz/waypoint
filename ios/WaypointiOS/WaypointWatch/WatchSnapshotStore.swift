@@ -8,6 +8,7 @@ final class WatchSnapshotStore: NSObject, ObservableObject {
 
     private let snapshotKey = "todaySnapshot"
     private let overviewKey = "trailOverview"
+    private let clearedKey = "cleared"
     private let snapshotDefaultsKey = "WaypointWatchTodaySnapshot"
     private let overviewDefaultsKey = "WaypointWatchTrailOverview"
 
@@ -24,6 +25,19 @@ final class WatchSnapshotStore: NSObject, ObservableObject {
     }
 
     private func receive(_ context: [String: Any]) {
+        // Sign-out signal: wipe the cached payloads unless this context also
+        // carries fresh data (a new account already signed in).
+        if context[clearedKey] != nil,
+           context[snapshotKey] == nil,
+           context[overviewKey] == nil {
+            DispatchQueue.main.async {
+                self.snapshot = nil
+                self.overview = nil
+                UserDefaults.standard.removeObject(forKey: self.snapshotDefaultsKey)
+                UserDefaults.standard.removeObject(forKey: self.overviewDefaultsKey)
+            }
+            return
+        }
         if let data = context[snapshotKey] as? Data,
            let value = try? JSONDecoder.watchSnapshot.decode(WatchTodaySnapshot.self, from: data) {
             DispatchQueue.main.async {

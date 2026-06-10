@@ -53,6 +53,46 @@ struct PointAtDistanceTests {
     }
 }
 
+@Suite("nearestPointOnRoute")
+struct NearestPointOnRouteTests {
+
+    @Test func nilForDegenerateLine() {
+        let single = LineString(coordinates: [[0, 0]])
+        #expect(nearestPointOnRoute(single, to: (0, 0)) == nil)
+    }
+
+    @Test func pointOnRouteHasZeroOffset() {
+        // Midpoint of the first segment, exactly on the line.
+        let proj = nearestPointOnRoute(line, to: (0.5, 0))
+        #expect(proj != nil)
+        #expect(proj!.offRouteKm < 1e-6)
+        #expect(abs(proj!.km - haversineKm((0, 0), (0.5, 0))) < 0.1)
+    }
+
+    @Test func kmAccumulatesAcrossSegments() {
+        // Just past the middle vertex → ~one full degree along the route.
+        let proj = nearestPointOnRoute(line, to: (1, 0.0005))
+        #expect(proj != nil)
+        #expect(abs(proj!.km - haversineKm((0, 0), (1, 0))) < 0.5)
+    }
+
+    @Test func offRouteReportsPerpendicularDistance() {
+        // ~0.01° north of the line at lon 1 → a few hundred metres off-route,
+        // but still snapped to km ≈ one degree along.
+        let proj = nearestPointOnRoute(line, to: (1, 0.01))
+        #expect(proj != nil)
+        #expect(proj!.offRouteKm > 0.5)
+        #expect(abs(proj!.km - haversineKm((0, 0), (1, 0))) < 0.5)
+    }
+
+    @Test func clampsBeyondEndToFinalVertex() {
+        let proj = nearestPointOnRoute(line, to: (3, 0))
+        #expect(proj != nil)
+        #expect(abs(proj!.point.lon - 2) < 1e-6)
+        #expect(abs(proj!.km - totalDistance(line)) < 0.1)
+    }
+}
+
 @Suite("sliceLineString")
 struct SliceTests {
 

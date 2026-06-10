@@ -11,7 +11,7 @@
 
 import Foundation
 
-enum AlertSeverity: String, Codable, Sendable {
+nonisolated enum AlertSeverity: String, Codable, Sendable {
     case yellow, orange, red
 
     var rank: Int {
@@ -23,7 +23,7 @@ enum AlertSeverity: String, Codable, Sendable {
     }
 }
 
-struct WeatherAlert: Codable, Sendable, Identifiable {
+nonisolated struct WeatherAlert: Codable, Sendable, Identifiable {
     var event: String
     var severity: AlertSeverity
     var onset: String?
@@ -37,7 +37,7 @@ struct WeatherAlert: Codable, Sendable, Identifiable {
 
 // MARK: - Severity / event labels
 
-private func parseSeverity(_ value: String) -> AlertSeverity? {
+nonisolated private func parseSeverity(_ value: String) -> AlertSeverity? {
     let parts = value.split(separator: ";").map {
         $0.trimmingCharacters(in: .whitespaces).lowercased()
     }
@@ -57,14 +57,14 @@ private func parseSeverity(_ value: String) -> AlertSeverity? {
     }
 }
 
-private let eventLabels: [String: String] = [
+nonisolated private let eventLabels: [String: String] = [
     "1": "Vítr", "2": "Sníh a led", "3": "Bouřky", "4": "Mlha",
     "5": "Vysoké teploty", "6": "Nízké teploty", "7": "Pobřežní jevy",
     "8": "Riziko požárů", "9": "Laviny", "10": "Déšť", "11": "Povodně",
     "12": "Déšť a povodně", "13": "Mořské bouře",
 ]
 
-private func parseEventType(_ value: String) -> String {
+nonisolated private func parseEventType(_ value: String) -> String {
     let parts = value.split(separator: ";").map { $0.trimmingCharacters(in: .whitespaces) }
     if let code = parts.first, let label = eventLabels[code] { return label }
     return parts.count > 1 ? parts[1] : (parts.first ?? "Výstraha počasí")
@@ -72,7 +72,7 @@ private func parseEventType(_ value: String) -> String {
 
 // MARK: - Untyped traversal helpers
 
-private func paramValue(_ params: Any?, _ name: String) -> String? {
+nonisolated private func paramValue(_ params: Any?, _ name: String) -> String? {
     guard let array = params as? [[String: Any]] else { return nil }
     for p in array where (p["valueName"] as? String) == name {
         if let value = p["value"] as? String { return value }
@@ -80,7 +80,7 @@ private func paramValue(_ params: Any?, _ name: String) -> String? {
     return nil
 }
 
-private func pickInfo(_ info: [[String: Any]]) -> [String: Any]? {
+nonisolated private func pickInfo(_ info: [[String: Any]]) -> [String: Any]? {
     guard !info.isEmpty else { return nil }
     func lang(_ i: [String: Any]) -> String { (i["language"] as? String ?? "").lowercased() }
     if let preferred = info.first(where: { lang($0).hasPrefix("cs") || lang($0).hasPrefix("sk") }) {
@@ -90,7 +90,7 @@ private func pickInfo(_ info: [[String: Any]]) -> [String: Any]? {
     return info.first
 }
 
-private func areaDescs(_ area: Any?) -> [String] {
+nonisolated private func areaDescs(_ area: Any?) -> [String] {
     guard let array = area as? [[String: Any]] else { return [] }
     return array.compactMap { $0["areaDesc"] as? String }.filter { !$0.isEmpty }
 }
@@ -98,7 +98,7 @@ private func areaDescs(_ area: Any?) -> [String] {
 /// Normalize a MeteoAlarm feed into active, displayable alerts.
 /// Drops green/level-1, expired, and unparseable warnings; dedups by
 /// (severity, event) merging areas; sorts most severe first.
-func parseMeteoalarmFeed(_ raw: Any, now: Date) -> [WeatherAlert] {
+nonisolated func parseMeteoalarmFeed(_ raw: Any, now: Date) -> [WeatherAlert] {
     guard let root = raw as? [String: Any],
           let warnings = root["warnings"] as? [[String: Any]] else { return [] }
 
@@ -146,18 +146,18 @@ func parseMeteoalarmFeed(_ raw: Any, now: Date) -> [WeatherAlert] {
 }
 
 /// Highest severity across a set of alerts, or nil if empty.
-func maxSeverity(_ alerts: [WeatherAlert]) -> AlertSeverity? {
+nonisolated func maxSeverity(_ alerts: [WeatherAlert]) -> AlertSeverity? {
     alerts.map(\.severity).max { $0.rank < $1.rank }
 }
 
 // MARK: - Country lookup
 
-private struct CountryBox {
+nonisolated private struct CountryBox {
     let slug: String
     let bbox: (west: Double, south: Double, east: Double, north: Double)
 }
 
-private let countryBoxes: [CountryBox] = [
+nonisolated private let countryBoxes: [CountryBox] = [
     .init(slug: "france", bbox: (8.4, 41.3, 9.7, 43.1)), // Corsica first
     .init(slug: "slovakia", bbox: (16.8, 47.7, 22.6, 49.7)),
     .init(slug: "czechia", bbox: (12.0, 48.5, 18.9, 51.1)),
@@ -176,7 +176,7 @@ private let countryBoxes: [CountryBox] = [
 ]
 
 /// Map a lat/lon to a MeteoAlarm country slug, or nil if outside coverage.
-func slugFromLatLon(lat: Double, lon: Double) -> String? {
+nonisolated func slugFromLatLon(lat: Double, lon: Double) -> String? {
     for box in countryBoxes {
         if lon >= box.bbox.west, lon <= box.bbox.east, lat >= box.bbox.south, lat <= box.bbox.north {
             return box.slug

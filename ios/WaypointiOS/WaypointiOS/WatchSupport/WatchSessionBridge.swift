@@ -7,6 +7,7 @@ final class WatchSessionBridge: NSObject {
 
     private let snapshotKey = "todaySnapshot"
     private let overviewKey = "trailOverview"
+    private let clearedKey = "cleared"
 
     /// Latest merged application context (both payloads live here so a second
     /// `updateApplicationContext` call never clobbers the first).
@@ -36,8 +37,21 @@ final class WatchSessionBridge: NSObject {
 
     private func stage(key: String, data: Data) {
         guard WCSession.isSupported() else { return }
+        // Real data supersedes any pending clear so the watch keeps the new account's payload.
+        latestContext[clearedKey] = nil
         latestContext[key] = data
         pendingUserInfo = [key: data]
+        flush()
+    }
+
+    /// Tell the watch to drop its cached snapshot/overview (e.g. on sign-out).
+    /// Replaces the whole context so a stale payload can't linger, and uses a
+    /// changing timestamp so WatchConnectivity always delivers the update.
+    func clear() {
+        guard WCSession.isSupported() else { return }
+        let token = Date().timeIntervalSince1970
+        latestContext = [clearedKey: token]
+        pendingUserInfo = [clearedKey: token]
         flush()
     }
 

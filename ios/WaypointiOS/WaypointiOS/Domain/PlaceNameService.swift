@@ -15,7 +15,6 @@ import Foundation
 actor PlaceNameService {
     static let shared = PlaceNameService()
 
-    private let geocoder = CLGeocoder()
     private let defaults = UserDefaults.standard
     // v2: bumped after fixing candidate priority (v1 cached municipality/county
     // names like "Gusinje"/"Shkodër" instead of the local "Vusanje"/"Theth").
@@ -40,9 +39,7 @@ actor PlaceNameService {
         if negative.contains(k) { return nil }
 
         do {
-            let placemarks = try await geocoder.reverseGeocodeLocation(
-                CLLocation(latitude: lat, longitude: lon)
-            )
+            let placemarks = try await reverseGeocode(CLLocation(latitude: lat, longitude: lon))
             guard let name = bestName(from: placemarks.first) else {
                 negative.insert(k)
                 return nil
@@ -54,6 +51,17 @@ actor PlaceNameService {
             // Offline / rate-limited: fall back to the coordinate, retry later.
             return nil
         }
+    }
+
+    /// Reverse-geocodes via CLGeocoder. Deliberately kept over MapKit's
+    /// MKReverseGeocodingRequest: CLPlacemark exposes the finer `name` (nearest
+    /// feature) and `subLocality` (village) fields that `bestName` relies on to
+    /// prefer the nearest village over a distant municipality. MKAddress only
+    /// surfaces the coarse city/region, which would regress that. The
+    /// `@available` annotation acknowledges the deprecation and silences it here.
+    @available(iOS, deprecated: 26.0, message: "CLGeocoder is intentional — see bestName's nearest-village logic.")
+    private func reverseGeocode(_ location: CLLocation) async throws -> [CLPlacemark] {
+        try await CLGeocoder().reverseGeocodeLocation(location)
     }
 
     private func bestName(from placemark: CLPlacemark?) -> String? {

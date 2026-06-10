@@ -10,7 +10,7 @@
 
 import Foundation
 
-struct CachedAlerts: Codable, Sendable {
+nonisolated struct CachedAlerts: Codable, Sendable {
     var country: String?
     var alerts: [WeatherAlert]
     var fetchedAt: Date

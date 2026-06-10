@@ -33,6 +33,16 @@ final class AppDatabase: Sendable {
         try applyMigrations(dbPool)
     }
 
+    // MARK: - Reset
+
+    /// Wipe every table (trails, stages, routes, waypoints, todos, caches,
+    /// sync_metadata, sync_queue) and rebuild the empty schema. Used on sign-out
+    /// so a different account never sees the previous user's local-first cache.
+    func eraseAllData() async throws {
+        try await dbPool.erase()
+        try applyMigrations(dbPool)
+    }
+
     // MARK: - Migrations
 
     private func applyMigrations(_ writer: DatabaseWriter) throws {

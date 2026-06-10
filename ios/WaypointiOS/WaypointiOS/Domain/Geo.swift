@@ -77,6 +77,54 @@ func pointAtDistance(_ line: LineString, _ targetKm: Double) -> Coord2 {
     return coords[coords.count - 1]
 }
 
+/// Result of snapping a free point onto a route: how far along the route the
+/// closest point sits (`km`), how far off the route the original point was
+/// (`offRouteKm`), and the snapped coordinate itself.
+struct RouteProjection: Sendable, Equatable {
+    let km: Double
+    let offRouteKm: Double
+    let point: Coord2
+
+    static func == (lhs: RouteProjection, rhs: RouteProjection) -> Bool {
+        lhs.km == rhs.km && lhs.offRouteKm == rhs.offRouteKm
+            && lhs.point.lon == rhs.point.lon && lhs.point.lat == rhs.point.lat
+    }
+}
+
+/// Snaps `p` onto the LineString, returning the closest point, its distance
+/// along the route, and the perpendicular (off-route) distance. Each segment is
+/// projected in a local equirectangular plane (longitude scaled by cos(lat)),
+/// which is accurate over the short spans involved in "where am I on the trail".
+/// Returns nil for a degenerate line (< 2 vertices).
+func nearestPointOnRoute(_ line: LineString, to p: Coord2) -> RouteProjection? {
+    let coords = line.coordinates.map(toCoord2)
+    guard coords.count >= 2 else { return nil }
+    let cum = cumulativeDistances(line)
+    let kx = cos(toRad(p.lat)) // longitude → planar x scaling at the query latitude
+
+    func planar(_ c: Coord2) -> (x: Double, y: Double) { (c.lon * kx, c.lat) }
+    let pp = planar(p)
+
+    var best: RouteProjection?
+    for i in 1 ..< coords.count {
+        let a = coords[i - 1], b = coords[i]
+        let pa = planar(a), pb = planar(b)
+        let dx = pb.x - pa.x, dy = pb.y - pa.y
+        let segLen2 = dx * dx + dy * dy
+        let t = segLen2 <= 0 ? 0 : max(0, min(1, ((pp.x - pa.x) * dx + (pp.y - pa.y) * dy) / segLen2))
+        let closest = Coord2(lon: a.lon + t * (b.lon - a.lon), lat: a.lat + t * (b.lat - a.lat))
+        let off = haversineKm(p, closest)
+        if best == nil || off < best!.offRouteKm {
+            best = RouteProjection(
+                km: cum[i - 1] + haversineKm(a, closest),
+                offRouteKm: off,
+                point: closest
+            )
+        }
+    }
+    return best
+}
+
 /// Sub-LineString from startKm to endKm.
 func sliceLineString(_ line: LineString, from startKm: Double, to endKm: Double) -> LineString {
     let coords = line.coordinates.map(toCoord2)

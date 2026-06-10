@@ -83,10 +83,26 @@ private struct TodayDashboardView: View {
 
     /// Distance scrubbed on the elevation profile (km), nil when not touching.
     @State private var scrubKm: Double?
+    /// Live GPS, snapped onto today's route for the "you are here" marker.
+    @State private var location = CurrentLocationProvider()
+
+    /// Off-route threshold (km). Beyond this we hide the marker rather than
+    /// snapping the hiker to a point on a trail they aren't actually walking.
+    private static let onRouteThresholdKm = 0.25
+
+    private var currentProjection: RouteProjection? {
+        guard let coord = location.coordinate, let line = dashboard.route?.line,
+              let proj = nearestPointOnRoute(line, to: coord),
+              proj.offRouteKm <= Self.onRouteThresholdKm
+        else { return nil }
+        return proj
+    }
 
     private var highlightCoord: Coord2? {
-        guard let km = scrubKm, let line = dashboard.route?.line else { return nil }
-        return pointAtDistance(line, km)
+        if let km = scrubKm, let line = dashboard.route?.line {
+            return pointAtDistance(line, km)
+        }
+        return currentProjection?.point
     }
 
     var body: some View {
@@ -111,7 +127,8 @@ private struct TodayDashboardView: View {
                     ElevationProfileChart(
                         profile: dashboard.elevationProfile,
                         rainOnset: dashboard.timeline?.rainOnset,
-                        scrubKm: $scrubKm
+                        scrubKm: $scrubKm,
+                        currentKm: currentProjection?.km
                     )
                     .padding()
                     .background(.background, in: RoundedRectangle(cornerRadius: 16))
@@ -163,6 +180,8 @@ private struct TodayDashboardView: View {
             }
             .padding()
         }
+        .onAppear { location.start() }
+        .onDisappear { location.stop() }
     }
 
     // MARK: - Compact premium header

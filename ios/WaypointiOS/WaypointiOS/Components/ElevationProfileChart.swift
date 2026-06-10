@@ -16,6 +16,10 @@ struct ElevationProfileChart: View {
     var rainOnset: RainOnset?
     /// Distance scrubbed by the user, in km. nil when not touching.
     @Binding var scrubKm: Double?
+    /// The hiker's live position projected onto the route, in km from start.
+    /// nil when location is unknown or off-route. Renders a green "you are here"
+    /// marker that coexists with scrubbing.
+    var currentKm: Double?
 
     private var maxKm: Double { profile.last?.dKm ?? 0 }
     private var minEle: Double { profile.map(\.eleM).min() ?? 0 }
@@ -24,6 +28,11 @@ struct ElevationProfileChart: View {
     private var scrubElevation: Int? {
         guard let scrubKm else { return nil }
         return elevationAtDistance(profile, scrubKm)
+    }
+
+    private var currentElevation: Int? {
+        guard let currentKm else { return nil }
+        return elevationAtDistance(profile, currentKm)
     }
 
     var body: some View {
@@ -62,6 +71,18 @@ struct ElevationProfileChart: View {
                                 .font(.system(size: 9, weight: .semibold))
                                 .foregroundStyle(.blue)
                         }
+                }
+
+                if let currentKm, let ele = currentElevation {
+                    RuleMark(x: .value("km", currentKm))
+                        .foregroundStyle(Color.green.opacity(0.7))
+                        .lineStyle(StrokeStyle(lineWidth: 1.5))
+                    PointMark(
+                        x: .value("km", currentKm),
+                        y: .value("m", Double(ele))
+                    )
+                    .foregroundStyle(Color.green)
+                    .symbolSize(150)
                 }
 
                 if let scrubKm, let ele = scrubElevation {
@@ -129,6 +150,11 @@ struct ElevationProfileChart: View {
                 Text(String(format: "%.1f km · %d m", scrubKm, ele))
                     .font(.caption.weight(.semibold).monospacedDigit())
                     .foregroundStyle(.orange)
+                    .transition(.opacity)
+            } else if let currentKm, let ele = currentElevation {
+                Label(String(format: "%.1f km · %d m", currentKm, ele), systemImage: "location.fill")
+                    .font(.caption.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.green)
                     .transition(.opacity)
             } else if let rainOnset {
                 Label(String(format: "%.1f km", rainOnset.distanceKm), systemImage: "cloud.rain.fill")
