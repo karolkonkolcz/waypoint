@@ -128,6 +128,15 @@ struct WatchTodayView: View {
                     RouteProfileChart(points: points)
                         .frame(height: 92)
 
+                    let precip = snapshot.routePrecip ?? []
+                    if precip.contains(where: { $0.precipMm > 0 }) {
+                        WatchPrecipStrip(
+                            points: precip,
+                            band: snapshot.rainBand,
+                            maxKm: points.last?.distanceKm ?? 0
+                        )
+                    }
+
                     HStack(spacing: 6) {
                         metric("Start", value: points.first.map { "\($0.elevationM)m" })
                         metric("Cíl", value: points.last.map { "\($0.elevationM)m" })
@@ -321,18 +330,35 @@ struct WatchTodayView: View {
     }
 }
 
+/// The "Profil trasy" elevation chart, watch edition. The curve is Catmull-Rom
+/// smoothed to match the iPhone chart. Rotating the Digital Crown scrubs an
+/// orange cursor along the route, reading out distance + elevation — the watch
+/// stand-in for the phone's finger-drag. Rain lives in a separate strip below
+/// (`WatchPrecipStrip`), keeping the profile clean.
 struct RouteProfileChart: View {
     let points: [WatchRouteProfilePoint]
+
+    /// Cursor position in km. nil until the crown is first turned.
+    @State private var scrubKm: Double?
+    @State private var crownValue: Double = 0
+    @FocusState private var focused: Bool
+
+    private var maxKm: Double { points.last?.distanceKm ?? 0 }
+    private var minElevation: Int { points.map(\.elevationM).min() ?? 0 }
+    private var maxElevation: Int { points.map(\.elevationM).max() ?? minElevation }
+
+    private var scrubElevation: Int? {
+        guard let scrubKm else { return nil }
+        return interpolatedElevation(at: scrubKm)
+    }
 
     var body: some View {
         GeometryReader { proxy in
             let size = proxy.size
-            let minElevation = points.map(\.elevationM).min() ?? 0
-            let maxElevation = points.map(\.elevationM).max() ?? minElevation
-            let distance = points.last?.distanceKm ?? 1
+            let distance = max(maxKm, 0.001)
 
-            ZStack(alignment: .bottomLeading) {
-                profileArea(size: size, minElevation: minElevation, maxElevation: maxElevation, distance: distance)
+            ZStack(alignment: .topTrailing) {
+                profileArea(size: size, distance: distance)
                     .fill(
                         LinearGradient(
                             colors: [.orange.opacity(0.30), .orange.opacity(0.04)],
@@ -340,62 +366,209 @@ struct RouteProfileChart: View {
                             endPoint: .bottom
                         )
                     )
-                profileLine(size: size, minElevation: minElevation, maxElevation: maxElevation, distance: distance)
+                profileLine(size: size, distance: distance)
                     .stroke(.orange, style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
+
+                endpointDots(size: size, distance: distance)
+
+                if let scrubKm, let ele = scrubElevation {
+                    marker(atKm: scrubKm, size: size, distance: distance, color: .orange)
+                    scrubDot(km: scrubKm, elevation: ele, size: size, distance: distance)
+                }
+
+                readout
             }
         }
-    }
-
-    private func profileLine(
-        size: CGSize,
-        minElevation: Int,
-        maxElevation: Int,
-        distance: Double
-    ) -> Path {
-        Path { path in
-            for (index, point) in points.enumerated() {
-                let coord = chartPoint(
-                    point,
-                    size: size,
-                    minElevation: minElevation,
-                    maxElevation: maxElevation,
-                    distance: distance
-                )
-                if index == 0 { path.move(to: coord) } else { path.addLine(to: coord) }
-            }
-        }
-    }
-
-    private func profileArea(
-        size: CGSize,
-        minElevation: Int,
-        maxElevation: Int,
-        distance: Double
-    ) -> Path {
-        var path = profileLine(
-            size: size,
-            minElevation: minElevation,
-            maxElevation: maxElevation,
-            distance: distance
+        .focusable(points.count >= 2)
+        .focused($focused)
+        .digitalCrownRotation(
+            $crownValue,
+            from: 0,
+            through: max(maxKm, 0.001),
+            by: max(maxKm, 0.001) / 100,
+            sensitivity: .medium,
+            isContinuous: false,
+            isHapticFeedbackEnabled: true
         )
+        .onChange(of: crownValue) { _, value in
+            scrubKm = min(max(value, 0), maxKm)
+        }
+        .onAppear { focused = true }
+    }
+
+    // MARK: Readout badge
+
+    @ViewBuilder private var readout: some View {
+        if let scrubKm, let ele = scrubElevation {
+            Text(String(format: "%.1f km · %d m", scrubKm, ele))
+                .font(.caption2.weight(.semibold).monospacedDigit())
+                .foregroundStyle(.black)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(.orange, in: Capsule())
+        } else if points.count >= 2 {
+            Image(systemName: "digitalcrown.horizontal.press.fill")
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+                .padding(2)
+        }
+    }
+
+    // MARK: Geometry
+
+    private func x(forKm km: Double, size: CGSize, distance: Double) -> CGFloat {
+        distance <= 0 ? 0 : CGFloat(km / distance) * size.width
+    }
+
+    private func y(forElevation elevation: Int, size: CGSize) -> CGFloat {
+        let span = max(1, maxElevation - minElevation)
+        let ratio = Double(elevation - minElevation) / Double(span)
+        return size.height - CGFloat(ratio) * size.height
+    }
+
+    private func chartPoint(_ point: WatchRouteProfilePoint, size: CGSize, distance: Double) -> CGPoint {
+        CGPoint(x: x(forKm: point.distanceKm, size: size, distance: distance),
+                y: y(forElevation: point.elevationM, size: size))
+    }
+
+    private func profileLine(size: CGSize, distance: Double) -> Path {
+        smoothPath(through: points.map { chartPoint($0, size: size, distance: distance) })
+    }
+
+    private func profileArea(size: CGSize, distance: Double) -> Path {
+        var path = profileLine(size: size, distance: distance)
         path.addLine(to: CGPoint(x: size.width, y: size.height))
         path.addLine(to: CGPoint(x: 0, y: size.height))
         path.closeSubpath()
         return path
     }
 
-    private func chartPoint(
-        _ point: WatchRouteProfilePoint,
-        size: CGSize,
-        minElevation: Int,
-        maxElevation: Int,
-        distance: Double
-    ) -> CGPoint {
-        let x = distance <= 0 ? 0 : (point.distanceKm / distance) * size.width
-        let elevationSpan = max(1, maxElevation - minElevation)
-        let yRatio = Double(point.elevationM - minElevation) / Double(elevationSpan)
-        let y = size.height - (yRatio * size.height)
-        return CGPoint(x: x, y: y)
+    private func marker(atKm km: Double, size: CGSize, distance: Double, color: Color) -> some View {
+        Rectangle()
+            .fill(color.opacity(0.9))
+            .frame(width: 1.5, height: size.height)
+            .position(x: x(forKm: km, size: size, distance: distance), y: size.height / 2)
+    }
+
+    private func scrubDot(km: Double, elevation: Int, size: CGSize, distance: Double) -> some View {
+        Circle()
+            .fill(.orange)
+            .frame(width: 8, height: 8)
+            .position(x: x(forKm: km, size: size, distance: distance),
+                      y: y(forElevation: elevation, size: size))
+    }
+
+    @ViewBuilder
+    private func endpointDots(size: CGSize, distance: Double) -> some View {
+        if let first = points.first, let last = points.last {
+            let start = chartPoint(first, size: size, distance: distance)
+            let end = chartPoint(last, size: size, distance: distance)
+            Circle().fill(.orange).frame(width: 5, height: 5).position(start)
+            Circle().fill(.orange).frame(width: 5, height: 5).position(end)
+        }
+    }
+
+    /// Catmull-Rom smoothing (converted to cubic Béziers), matching the iPhone
+    /// chart's `.catmullRom` interpolation.
+    private func smoothPath(through pts: [CGPoint]) -> Path {
+        var path = Path()
+        guard let first = pts.first else { return path }
+        path.move(to: first)
+        guard pts.count > 2 else {
+            for p in pts.dropFirst() { path.addLine(to: p) }
+            return path
+        }
+        for i in 0..<pts.count - 1 {
+            let p0 = pts[max(i - 1, 0)]
+            let p1 = pts[i]
+            let p2 = pts[i + 1]
+            let p3 = pts[min(i + 2, pts.count - 1)]
+            let c1 = CGPoint(x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6)
+            let c2 = CGPoint(x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6)
+            path.addCurve(to: p2, control1: c1, control2: c2)
+        }
+        return path
+    }
+
+    /// Linear interpolation of elevation at an arbitrary distance.
+    private func interpolatedElevation(at km: Double) -> Int? {
+        guard let first = points.first, let last = points.last else { return nil }
+        if km <= first.distanceKm { return first.elevationM }
+        if km >= last.distanceKm { return last.elevationM }
+        for i in 1..<points.count {
+            let a = points[i - 1], b = points[i]
+            if km <= b.distanceKm {
+                let span = b.distanceKm - a.distanceKm
+                let t = span <= 0 ? 0 : (km - a.distanceKm) / span
+                return Int((Double(a.elevationM) + t * Double(b.elevationM - a.elevationM)).rounded())
+            }
+        }
+        return last.elevationM
+    }
+}
+
+/// "Srážky na trase" — a compact precipitation bar strip shown under the watch
+/// profile, sharing its distance axis. Bars run deep blue → cyan at the peak;
+/// a caption gives the rain window and where it's heaviest.
+struct WatchPrecipStrip: View {
+    let points: [WatchRoutePrecipPoint]
+    var band: WatchRainBand?
+    let maxKm: Double
+
+    private var maxPrecip: Double { max(points.map(\.precipMm).max() ?? 0, 0.1) }
+    private let rainLight = Color(red: 100 / 255, green: 210 / 255, blue: 255 / 255)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("SRÁŽKY NA TRASE")
+                .font(.system(size: 9, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(.secondary)
+
+            GeometryReader { proxy in
+                let size = proxy.size
+                let distance = max(maxKm, 0.001)
+                let barWidth = max(size.width / CGFloat(max(points.count, 1)) * 0.7, 1)
+                ForEach(Array(points.enumerated()), id: \.offset) { _, point in
+                    if point.precipMm > 0 {
+                        let height = max(CGFloat(point.precipMm / maxPrecip) * size.height, 1)
+                        RoundedRectangle(cornerRadius: 0.5)
+                            .fill(barColor(point.precipMm))
+                            .frame(width: barWidth, height: height)
+                            .position(
+                                x: CGFloat(point.km / distance) * size.width,
+                                y: size.height - height / 2
+                            )
+                    }
+                }
+            }
+            .frame(height: 28)
+
+            if let band {
+                Text("\(clock(band.startHour))–\(clock(band.endHour)) · vrchol u \(peakLabel(band.peakKm)) km")
+                    .font(.system(size: 9, weight: .medium).monospacedDigit())
+                    .foregroundStyle(rainLight)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+        }
+    }
+
+    private func barColor(_ value: Double) -> Color {
+        let t = min(max(value / maxPrecip, 0), 1)
+        func lerp(_ a: Double, _ b: Double) -> Double { (a + (b - a) * t) / 255 }
+        return Color(red: lerp(25, 100), green: lerp(118, 210), blue: lerp(210, 255))
+    }
+
+    private func peakLabel(_ km: Double) -> String {
+        String(format: "%.1f", km).replacingOccurrences(of: ".", with: ",")
+    }
+
+    private func clock(_ hour: Double) -> String {
+        var whole = Int(floor(hour))
+        var minutes = Int(((hour - Double(whole)) * 60).rounded())
+        if minutes >= 60 { whole += 1; minutes -= 60 }
+        return String(format: "%02d:%02d", whole % 24, minutes)
     }
 }
 
@@ -432,6 +605,12 @@ struct RouteProfileChart: View {
             .init(hour: 10.5, title: "Nejvyšší bod", detail: nil, distanceKm: 8, elevationM: 2010, isWeather: false),
             .init(hour: 15, title: "Srážky na trase", detail: "1.2 mm/h", distanceKm: 14.2, elevationM: 1650, isWeather: true),
             .init(hour: 14.4, title: "La Fouly", detail: "Cíl", distanceKm: 19.4, elevationM: 980, isWeather: false)
-        ]
+        ],
+        rainBand: WatchRainBand(startKm: 11.5, endKm: 16.2, peakKm: 14.2, startHour: 12.8, endHour: 13.6),
+        routePrecip: (0..<24).map {
+            let km = Double($0) / 23 * 19.4
+            let d = km - 14.2
+            return WatchRoutePrecipPoint(km: km, precipMm: max(0, 2.4 * exp(-d * d / 8)))
+        }
     ))
 }

@@ -124,12 +124,25 @@ private struct TodayDashboardView: View {
                 hero
 
                 if !dashboard.isTransit, dashboard.elevationProfile.count >= 2 {
-                    ElevationProfileChart(
-                        profile: dashboard.elevationProfile,
-                        rainOnset: dashboard.timeline?.rainOnset,
-                        scrubKm: $scrubKm,
-                        currentKm: currentProjection?.km
-                    )
+                    VStack(alignment: .leading, spacing: 14) {
+                        ElevationProfileChart(
+                            profile: dashboard.elevationProfile,
+                            scrubKm: $scrubKm,
+                            currentKm: currentProjection?.km
+                        )
+
+                        if let band = dashboard.timeline?.rainBand {
+                            RoutePrecipStrip(
+                                points: precipAlongRoute(
+                                    dashboard.weather,
+                                    totalKm: dashboard.elevationProfile.last?.dKm ?? 0
+                                ),
+                                band: band,
+                                maxKm: dashboard.elevationProfile.last?.dKm ?? 0,
+                                maxElevationM: Int((dashboard.elevationProfile.map(\.eleM).max() ?? 0).rounded())
+                            )
+                        }
+                    }
                     .padding()
                     .background(.background, in: RoundedRectangle(cornerRadius: 16))
                     .overlay { RoundedRectangle(cornerRadius: 16).stroke(.quaternary) }

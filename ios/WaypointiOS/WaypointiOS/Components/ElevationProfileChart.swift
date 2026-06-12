@@ -13,7 +13,6 @@ import SwiftUI
 
 struct ElevationProfileChart: View {
     let profile: [ElevationPoint]
-    var rainOnset: RainOnset?
     /// Distance scrubbed by the user, in km. nil when not touching.
     @Binding var scrubKm: Double?
     /// The hiker's live position projected onto the route, in km from start.
@@ -60,17 +59,6 @@ struct ElevationProfileChart: View {
                     .interpolationMethod(.catmullRom)
                     .foregroundStyle(Color.accentColor)
                     .lineStyle(StrokeStyle(lineWidth: 2))
-                }
-
-                if let rainOnset, scrubKm == nil {
-                    RuleMark(x: .value("km", rainOnset.distanceKm))
-                        .foregroundStyle(Color.blue.opacity(0.5))
-                        .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
-                        .annotation(position: .top, alignment: .center, spacing: 2) {
-                            Label("déšť", systemImage: "cloud.rain.fill")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(.blue)
-                        }
                 }
 
                 if let currentKm, let ele = currentElevation {
@@ -156,10 +144,6 @@ struct ElevationProfileChart: View {
                     .font(.caption.weight(.semibold).monospacedDigit())
                     .foregroundStyle(.green)
                     .transition(.opacity)
-            } else if let rainOnset {
-                Label(String(format: "%.1f km", rainOnset.distanceKm), systemImage: "cloud.rain.fill")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
             } else {
                 Text("Táhni prstem")
                     .font(.caption2)

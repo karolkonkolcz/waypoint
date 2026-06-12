@@ -34,7 +34,28 @@ extension WatchTodaySnapshot {
             todoTitles: openTodos.prefix(3).map(\.text),
             dayNumber: dashboard.isTransit ? nil : dashboard.dayNumber,
             routeProfile: Self.makeRouteProfile(dashboard.elevationProfile),
-            timelineItems: Self.makeTimelineItems(dashboard.timeline)
+            timelineItems: Self.makeTimelineItems(dashboard.timeline),
+            rainBand: Self.makeRainBand(dashboard.isTransit ? nil : dashboard.timeline?.rainBand),
+            routePrecip: Self.makeRoutePrecip(dashboard)
+        )
+    }
+
+    private static func makeRoutePrecip(_ dashboard: TodayDashboard) -> [WatchRoutePrecipPoint] {
+        guard !dashboard.isTransit, dashboard.timeline?.rainBand != nil else { return [] }
+        let totalKm = dashboard.elevationProfile.last?.dKm ?? 0
+        return precipAlongRoute(dashboard.weather, totalKm: totalKm, samples: 24).map {
+            WatchRoutePrecipPoint(km: $0.km, precipMm: $0.precipMm)
+        }
+    }
+
+    private static func makeRainBand(_ band: RainBand?) -> WatchRainBand? {
+        guard let band else { return nil }
+        return WatchRainBand(
+            startKm: band.startKm,
+            endKm: band.endKm,
+            peakKm: band.peakKm,
+            startHour: band.startHour,
+            endHour: band.endHour
         )
     }
 

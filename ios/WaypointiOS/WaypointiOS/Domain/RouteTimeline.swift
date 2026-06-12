@@ -33,9 +33,23 @@ struct RainOnset: Sendable, Equatable {
     var precipMm: Double
 }
 
+/// The stretch of route where significant rain is projected — start → peak →
+/// end, in km along the route, with the clock time you reach each edge. Drawn
+/// as a shaded band on the elevation profile (more informative than a single
+/// onset line: it shows how long you'll be in it and where it's heaviest).
+struct RainBand: Sendable, Equatable {
+    var startKm: Double
+    var endKm: Double
+    var peakKm: Double
+    var startHour: Double
+    var endHour: Double
+    var peakPrecipMm: Double
+}
+
 struct RouteTimeline: Sendable {
     var rows: [RouteTimelineRow]
     var rainOnset: RainOnset?
+    var rainBand: RainBand?
     var arrivalHour: Double
 
     /// Replace the start/finish row titles. Used after the direction's
@@ -54,6 +68,12 @@ struct RouteTimeline: Sendable {
 }
 
 private let rainThresholdMm = 0.5
+/// The band brackets *any* projected rain (matching the "déšť kolem HH:00"
+/// headline, which fires on `precipMm > 0`), not just heavy rain — otherwise
+/// light drizzle that the summary promises would leave the profile blank.
+/// Precip is rounded to tenths, so `>= 0.05` catches every >=0.1 mm/h hour the
+/// headline does, while still giving the edges a real midpoint to interpolate.
+private let rainBandThresholdMm = 0.05
 
 /// Interpolated elevation (m) at `targetKm` along the profile. Clamps to ends.
 func elevationAtDistance(_ profile: [ElevationPoint], _ targetKm: Double) -> Int? {
@@ -108,6 +128,110 @@ private func nearestRow(_ rows: [RouteTimelineRow], _ distanceKm: Double) -> Rou
     return bestDistance <= 2 ? best : nil
 }
 
+/// Clock time (decimal hours) you reach `km`, interpolated from the moving-
+/// weather entries' own (km, hour) pairs.
+private func hourAtKmMoving(_ entries: [MovingWeatherEntry], _ km: Double) -> Double {
+    guard let first = entries.first, let last = entries.last else { return 0 }
+    if km <= first.km { return Double(first.hour) }
+    if km >= last.km { return Double(last.hour) }
+    for i in 1 ..< entries.count {
+        let a = entries[i - 1], b = entries[i]
+        if b.km >= km {
+            let span = b.km - a.km
+            let t = span <= 0 ? 0 : (km - a.km) / span
+            return Double(a.hour) + t * Double(b.hour - a.hour)
+        }
+    }
+    return Double(last.hour)
+}
+
+/// The first contiguous run of significant rain along the route, as a band with
+/// interpolated threshold-crossing edges and a precipitation peak.
+func rainBandFromSnapshot(_ snapshot: WeatherSnapshot?, profile: [ElevationPoint]) -> RainBand? {
+    guard let moving = snapshot?.moving else { return nil }
+    let entries = moving.filter { $0.phase == .moving }.sorted { $0.km < $1.km }
+    guard let firstWet = entries.firstIndex(where: { $0.precipMm >= rainBandThresholdMm }) else {
+        return nil
+    }
+
+    var lastWet = firstWet
+    while lastWet + 1 < entries.count, entries[lastWet + 1].precipMm > rainBandThresholdMm {
+        lastWet += 1
+    }
+
+    let totalKm = profile.last?.dKm ?? entries[lastWet].km
+
+    // Start edge: where precip crosses the threshold between the dry and wet entry.
+    let startKm: Double
+    if firstWet > 0 {
+        let a = entries[firstWet - 1], b = entries[firstWet]
+        let denom = b.precipMm - a.precipMm
+        let t = denom <= 0 ? 0 : min(max((rainBandThresholdMm - a.precipMm) / denom, 0), 1)
+        startKm = a.km + t * (b.km - a.km)
+    } else {
+        startKm = max(entries[firstWet].km, 0)
+    }
+
+    // End edge: where precip drops back below the threshold.
+    let endKm: Double
+    if lastWet + 1 < entries.count {
+        let a = entries[lastWet], b = entries[lastWet + 1]
+        let denom = a.precipMm - b.precipMm
+        let t = denom <= 0 ? 0 : min(max((a.precipMm - rainBandThresholdMm) / denom, 0), 1)
+        endKm = a.km + t * (b.km - a.km)
+    } else {
+        endKm = min(entries[lastWet].km, totalKm)
+    }
+
+    let peak = entries[firstWet ... lastWet].max { $0.precipMm < $1.precipMm } ?? entries[firstWet]
+
+    return RainBand(
+        startKm: startKm,
+        endKm: max(endKm, startKm),
+        peakKm: peak.km,
+        startHour: hourAtKmMoving(entries, startKm),
+        endHour: hourAtKmMoving(entries, endKm),
+        peakPrecipMm: peak.precipMm
+    )
+}
+
+/// One precipitation bar along the route, keyed by distance.
+struct RoutePrecipPoint: Sendable, Equatable, Identifiable {
+    var id: Double { km }
+    var km: Double
+    var precipMm: Double
+}
+
+/// Projected precipitation (mm/h) sampled at evenly spaced points along the
+/// route, interpolated from the hourly moving-weather entries. Drives the
+/// "Srážky na trase" bar strip beneath the elevation profile, sharing its
+/// distance axis. Returns `[]` when there's no moving forecast.
+func precipAlongRoute(_ snapshot: WeatherSnapshot?, totalKm: Double, samples: Int = 36) -> [RoutePrecipPoint] {
+    guard let moving = snapshot?.moving, totalKm > 0, samples > 1 else { return [] }
+    let entries = moving.filter { $0.phase == .moving }.sorted { $0.km < $1.km }
+    guard let first = entries.first, let last = entries.last else { return [] }
+
+    func precipAtKm(_ km: Double) -> Double {
+        if km <= first.km { return first.precipMm }
+        if km >= last.km { return last.precipMm }
+        for i in 1 ..< entries.count {
+            let a = entries[i - 1], b = entries[i]
+            if b.km >= km {
+                let span = b.km - a.km
+                let t = span <= 0 ? 0 : (km - a.km) / span
+                return a.precipMm + t * (b.precipMm - a.precipMm)
+            }
+        }
+        return last.precipMm
+    }
+
+    let step = totalKm / Double(samples - 1)
+    return (0 ..< samples).map { i in
+        let km = Double(i) * step
+        return RoutePrecipPoint(km: km, precipMm: max(0, precipAtKm(km)))
+    }
+}
+
 func rainOnsetFromSnapshot(_ snapshot: WeatherSnapshot?, profile: [ElevationPoint]) -> RainOnset? {
     guard let moving = snapshot?.moving, !moving.isEmpty else { return nil }
     guard let wet = moving.first(where: { $0.phase == .moving && $0.precipMm >= rainThresholdMm }) else {
@@ -131,7 +255,7 @@ func buildRouteTimeline(
     snapshot: WeatherSnapshot?
 ) -> RouteTimeline {
     guard profile.count >= 2 else {
-        return RouteTimeline(rows: [], rainOnset: nil, arrivalHour: Double(startHour))
+        return RouteTimeline(rows: [], rainOnset: nil, rainBand: nil, arrivalHour: Double(startHour))
     }
 
     let timeProfile = cumulativeTimeProfile(profile: profile, paceKmh: paceKmh)
@@ -180,6 +304,7 @@ func buildRouteTimeline(
     ))
 
     let rainOnset = rainOnsetFromSnapshot(snapshot, profile: profile)
+    let rainBand = rainBandFromSnapshot(snapshot, profile: profile)
     if let rainOnset {
         let near = nearestRow(rows, rainOnset.distanceKm)
         rows.append(RouteTimelineRow(
@@ -194,5 +319,5 @@ func buildRouteTimeline(
         if $0.distanceKm != $1.distanceKm { return $0.distanceKm < $1.distanceKm }
         return ($0.isStorm ? 1 : 0) > ($1.isStorm ? 1 : 0)
     }
-    return RouteTimeline(rows: rows, rainOnset: rainOnset, arrivalHour: arrivalHour)
+    return RouteTimeline(rows: rows, rainOnset: rainOnset, rainBand: rainBand, arrivalHour: arrivalHour)
 }
