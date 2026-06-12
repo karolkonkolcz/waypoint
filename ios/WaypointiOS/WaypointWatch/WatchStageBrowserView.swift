@@ -81,6 +81,7 @@ struct WatchStageDetailView: View {
     /// Crown scrub readout, shown in the profile header instead of over the
     /// curve. nil until the crown is first turned.
     @State private var profileReadout: String?
+    @State private var profileScrubKm: Double?
 
     var body: some View {
         TabView(selection: $page) {
@@ -117,7 +118,7 @@ struct WatchStageDetailView: View {
                     header(systemImage: "chart.xyaxis.line")
                 }
                 if stage.routeProfile.count >= 2 {
-                    RouteProfileChart(points: stage.routeProfile, readout: $profileReadout)
+                    RouteProfileChart(points: stage.routeProfile, readout: $profileReadout, scrubKm: $profileScrubKm)
                         .frame(height: 92)
                     HStack(spacing: 6) {
                         metric("Start", stage.routeProfile.first.map { "\($0.elevationM)m" })

@@ -10,6 +10,9 @@ struct WatchTodayView: View {
     /// crown is first turned.
     @State private var profileReadout: String?
 
+    /// Lifted scrub position so the back button can reset it to nil.
+    @State private var profileScrubKm: Double?
+
     /// Live GPS, streamed while the profile page is visible.
     @State private var location = CurrentLocationProvider()
 
@@ -48,9 +51,9 @@ struct WatchTodayView: View {
                 if let snapshot {
                     if snapshot.isAvailable {
                         TabView(selection: $page) {
-                            profile(snapshot)
-                                .tag(0)
                             ScrollView { available(snapshot) }
+                                .tag(0)
+                            profile(snapshot)
                                 .tag(1)
                             timeline(snapshot)
                                 .tag(2)
@@ -165,7 +168,8 @@ struct WatchTodayView: View {
                     RouteProfileChart(
                         points: points,
                         readout: $profileReadout,
-                        currentKm: currentKm(for: snapshot)
+                        currentKm: currentKm(for: snapshot),
+                        scrubKm: $profileScrubKm
                     )
                     .frame(height: 92)
                     .onAppear { location.start() }
@@ -249,7 +253,8 @@ struct WatchTodayView: View {
     private func profilePageHeader(_ snapshot: WatchTodaySnapshot) -> some View {
         HStack(spacing: 7) {
             Button {
-                page = 1
+                profileScrubKm = nil
+                profileReadout = nil
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 13, weight: .semibold))
@@ -426,8 +431,9 @@ struct RouteProfileChart: View {
     /// location is unavailable or the hiker is off-route.
     var currentKm: Double? = nil
 
-    /// Cursor position in km. nil until the crown is first turned.
-    @State private var scrubKm: Double?
+    /// Cursor position in km, lifted to the parent so the back button can
+    /// reset it to nil without recreating the chart.
+    @Binding var scrubKm: Double?
     @State private var crownValue: Double = 0
     @FocusState private var focused: Bool
 
