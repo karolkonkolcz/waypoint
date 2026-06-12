@@ -78,6 +78,10 @@ struct WatchStageDetailView: View {
     let trailName: String
     @State private var page = 0
 
+    /// Crown scrub readout, shown in the profile header instead of over the
+    /// curve. nil until the crown is first turned.
+    @State private var profileReadout: String?
+
     var body: some View {
         TabView(selection: $page) {
             mapPage.tag(0)
@@ -101,9 +105,19 @@ struct WatchStageDetailView: View {
     private var profilePage: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                header(systemImage: "chart.xyaxis.line")
+                if let profileReadout {
+                    Text(profileReadout)
+                        .font(.subheadline.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(.orange, in: Capsule())
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    header(systemImage: "chart.xyaxis.line")
+                }
                 if stage.routeProfile.count >= 2 {
-                    RouteProfileChart(points: stage.routeProfile)
+                    RouteProfileChart(points: stage.routeProfile, readout: $profileReadout)
                         .frame(height: 92)
                     HStack(spacing: 6) {
                         metric("Start", stage.routeProfile.first.map { "\($0.elevationM)m" })

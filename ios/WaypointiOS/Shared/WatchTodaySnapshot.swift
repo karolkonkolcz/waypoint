@@ -24,6 +24,9 @@ struct WatchTodaySnapshot: Codable, Equatable, Sendable {
     var timelineItems: [WatchRouteTimelineItem]? = nil
     var rainBand: WatchRainBand? = nil
     var routePrecip: [WatchRoutePrecipPoint]? = nil
+    /// `[lon, lat]` pairs for today's stage route, downsampled. Used by the
+    /// watch to project the live GPS fix onto the route ("you are here").
+    var routePolyline: [[Double]]? = nil
 
     static func unavailable(title: String, subtitle: String) -> WatchTodaySnapshot {
         WatchTodaySnapshot(

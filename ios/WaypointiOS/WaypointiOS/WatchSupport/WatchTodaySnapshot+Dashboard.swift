@@ -36,8 +36,18 @@ extension WatchTodaySnapshot {
             routeProfile: Self.makeRouteProfile(dashboard.elevationProfile),
             timelineItems: Self.makeTimelineItems(dashboard.timeline),
             rainBand: Self.makeRainBand(dashboard.isTransit ? nil : dashboard.timeline?.rainBand),
-            routePrecip: Self.makeRoutePrecip(dashboard)
+            routePrecip: Self.makeRoutePrecip(dashboard),
+            routePolyline: Self.makeRoutePolyline(dashboard.route?.line)
         )
+    }
+
+    private static func makeRoutePolyline(_ line: LineString?) -> [[Double]] {
+        guard let coords = line?.coordinates, !coords.isEmpty else { return [] }
+        let step = max(1, (coords.count - 1) / 59)
+        var result: [[Double]] = stride(from: 0, to: coords.count - 1, by: step)
+            .map { Array(coords[$0].prefix(2)) }
+        result.append(Array(coords.last!.prefix(2)))
+        return result
     }
 
     private static func makeRoutePrecip(_ dashboard: TodayDashboard) -> [WatchRoutePrecipPoint] {

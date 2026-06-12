@@ -394,6 +394,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Waypoint;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Waypoint potřebuje polohu pro zobrazení tvé pozice na trase.";
 				INFOPLIST_KEY_WKApplication = YES;
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.karolkonkol.WaypointiOS;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -426,6 +427,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Waypoint;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Waypoint potřebuje polohu pro zobrazení tvé pozice na trase.";
 				INFOPLIST_KEY_WKApplication = YES;
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.karolkonkol.WaypointiOS;
 				LD_RUNPATH_SEARCH_PATHS = (

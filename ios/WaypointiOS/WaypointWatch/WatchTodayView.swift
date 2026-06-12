@@ -5,6 +5,43 @@ struct WatchTodayView: View {
     var overview: WatchTrailOverview? = nil
     @State private var page = 1
 
+    /// Crown scrub readout lifted out of the chart so it can take the place of
+    /// the "Profil" header title instead of covering the curve. nil until the
+    /// crown is first turned.
+    @State private var profileReadout: String?
+
+    /// Live GPS, streamed while the profile page is visible.
+    @State private var location = CurrentLocationProvider()
+
+    private static let onRouteThresholdKm = 0.25
+
+    /// Hiker's position projected onto today's route in km from start.
+    private func currentKm(for snapshot: WatchTodaySnapshot) -> Double? {
+        guard let coord = location.coordinate,
+              let polyline = snapshot.routePolyline, polyline.count >= 2
+        else { return nil }
+        let line = LineString(coordinates: polyline)
+        guard let proj = nearestPointOnRoute(line, to: coord),
+              proj.offRouteKm <= Self.onRouteThresholdKm
+        else { return nil }
+        return proj.km
+    }
+
+    private func interpolatedWatchElevation(_ pts: [WatchRouteProfilePoint], at km: Double) -> Int {
+        guard let first = pts.first, let last = pts.last else { return 0 }
+        if km <= first.distanceKm { return first.elevationM }
+        if km >= last.distanceKm { return last.elevationM }
+        for i in 1..<pts.count {
+            let a = pts[i - 1], b = pts[i]
+            if km <= b.distanceKm {
+                let span = b.distanceKm - a.distanceKm
+                let t = span <= 0 ? 0 : (km - a.distanceKm) / span
+                return Int((Double(a.elevationM) + t * Double(b.elevationM - a.elevationM)).rounded())
+            }
+        }
+        return last.elevationM
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -121,12 +158,18 @@ struct WatchTodayView: View {
     private func profile(_ snapshot: WatchTodaySnapshot) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                pageHeader("Profil", systemImage: "chart.xyaxis.line")
+                profilePageHeader(snapshot)
 
                 let points = snapshot.routeProfile ?? []
                 if points.count >= 2 {
-                    RouteProfileChart(points: points)
-                        .frame(height: 92)
+                    RouteProfileChart(
+                        points: points,
+                        readout: $profileReadout,
+                        currentKm: currentKm(for: snapshot)
+                    )
+                    .frame(height: 92)
+                    .onAppear { location.start() }
+                    .onDisappear { location.stop() }
 
                     let precip = snapshot.routePrecip ?? []
                     if precip.contains(where: { $0.precipMm > 0 }) {
@@ -199,6 +242,43 @@ struct WatchTodayView: View {
                 }
             }
             .padding(.horizontal, 2)
+        }
+    }
+
+    @ViewBuilder
+    private func profilePageHeader(_ snapshot: WatchTodaySnapshot) -> some View {
+        HStack(spacing: 7) {
+            Button {
+                page = 1
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+
+            if let scrub = profileReadout {
+                Text(scrub)
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(.orange, in: Capsule())
+                    .transition(.opacity)
+            } else if let km = currentKm(for: snapshot),
+                      let pts = snapshot.routeProfile, pts.count >= 2 {
+                Label(
+                    String(format: "%.1f km · %d m", km, interpolatedWatchElevation(pts, at: km)),
+                    systemImage: "location.fill"
+                )
+                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .foregroundStyle(.green)
+                .transition(.opacity)
+            } else {
+                Label("Profil", systemImage: "chart.xyaxis.line")
+                    .font(.headline)
+                    .labelStyle(.titleAndIcon)
+            }
         }
     }
 
@@ -338,6 +418,14 @@ struct WatchTodayView: View {
 struct RouteProfileChart: View {
     let points: [WatchRouteProfilePoint]
 
+    /// Distance + elevation readout, surfaced in the page header instead of over
+    /// the curve. nil until the crown is first turned.
+    @Binding var readout: String?
+
+    /// Hiker's live GPS position projected onto the route in km. nil when
+    /// location is unavailable or the hiker is off-route.
+    var currentKm: Double? = nil
+
     /// Cursor position in km. nil until the crown is first turned.
     @State private var scrubKm: Double?
     @State private var crownValue: Double = 0
@@ -371,12 +459,17 @@ struct RouteProfileChart: View {
 
                 endpointDots(size: size, distance: distance)
 
+                if let currentKm, let ele = interpolatedElevation(at: currentKm) {
+                    marker(atKm: currentKm, size: size, distance: distance, color: .green.opacity(0.8))
+                    positionDot(km: currentKm, elevation: ele, size: size, distance: distance)
+                }
+
                 if let scrubKm, let ele = scrubElevation {
                     marker(atKm: scrubKm, size: size, distance: distance, color: .orange)
                     scrubDot(km: scrubKm, elevation: ele, size: size, distance: distance)
                 }
 
-                readout
+                crownHint
             }
         }
         .focusable(points.count >= 2)
@@ -391,22 +484,21 @@ struct RouteProfileChart: View {
             isHapticFeedbackEnabled: true
         )
         .onChange(of: crownValue) { _, value in
-            scrubKm = min(max(value, 0), maxKm)
+            let km = min(max(value, 0), maxKm)
+            scrubKm = km
+            if let ele = interpolatedElevation(at: km) {
+                readout = String(format: "%.1f km · %d m", km, ele)
+            }
         }
         .onAppear { focused = true }
     }
 
-    // MARK: Readout badge
+    // MARK: Crown hint
 
-    @ViewBuilder private var readout: some View {
-        if let scrubKm, let ele = scrubElevation {
-            Text(String(format: "%.1f km · %d m", scrubKm, ele))
-                .font(.caption2.weight(.semibold).monospacedDigit())
-                .foregroundStyle(.black)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 2)
-                .background(.orange, in: Capsule())
-        } else if points.count >= 2 {
+    /// A faint "turn the crown" cue shown until the first scrub. The live
+    /// readout itself now lives in the page header (see `WatchTodayView`).
+    @ViewBuilder private var crownHint: some View {
+        if scrubKm == nil, points.count >= 2 {
             Image(systemName: "digitalcrown.horizontal.press.fill")
                 .font(.system(size: 11))
                 .foregroundStyle(.tertiary)
@@ -454,6 +546,15 @@ struct RouteProfileChart: View {
         Circle()
             .fill(.orange)
             .frame(width: 8, height: 8)
+            .position(x: x(forKm: km, size: size, distance: distance),
+                      y: y(forElevation: elevation, size: size))
+    }
+
+    private func positionDot(km: Double, elevation: Int, size: CGSize, distance: Double) -> some View {
+        Circle()
+            .fill(.green)
+            .frame(width: 9, height: 9)
+            .overlay(Circle().stroke(.black.opacity(0.4), lineWidth: 1))
             .position(x: x(forKm: km, size: size, distance: distance),
                       y: y(forElevation: elevation, size: size))
     }
