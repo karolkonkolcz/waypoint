@@ -19,12 +19,18 @@ final class TrailListViewModel {
     private let repo = TrailRepository()
     private var observationTask: Task<Void, Never>?
 
-    // Called by .task { } and .refreshable { } in the view.
-    // First call starts the live observation; subsequent calls also sync queued
-    // local writes and pull fresh Supabase data.
+    // Called by .task { } in the view. The observation renders the local cache
+    // immediately; the sync that follows is best-effort and may be skipped
+    // entirely when offline or inside a backoff window.
     func load() async {
         startObservationIfNeeded()
         await SyncEngine.shared.sync()
+    }
+
+    /// Pull-to-refresh: bypasses the sync engine's backoff window.
+    func refresh() async {
+        startObservationIfNeeded()
+        await SyncEngine.shared.sync(.userInitiated)
     }
 
     func delete(_ trail: Trail) {

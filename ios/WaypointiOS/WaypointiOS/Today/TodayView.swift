@@ -13,7 +13,7 @@ struct TodayView: View {
                     }
                 }
                 .task { await model.load() }
-                .refreshable { await model.load() }
+                .refreshable { await model.refresh() }
         }
     }
 

@@ -50,15 +50,31 @@ final class TodayViewModel {
     private let waypointRepo = WaypointRepository()
 
     func load() async {
+        await load(trigger: .automatic)
+    }
+
+    /// Pull-to-refresh: bypasses the sync engine's backoff window.
+    func refresh() async {
+        await load(trigger: .userInitiated)
+    }
+
+    private func load(trigger: SyncEngine.Trigger) async {
         if case .loaded = state { } else { state = .loading }
-        await SyncEngine.shared.sync()
+        // Local-first: paint the day from GRDB before touching the network. A
+        // weak signal must never hold today's plan hostage — that is the field
+        // failure this ordering exists to prevent.
+        reloadFromLocal(renderEmptyState: false)
+        await SyncEngine.shared.sync(trigger)
         reloadFromLocal()
         await refreshAlerts()
         await enrichDirection()
         await enrichWatchOverview()
     }
 
-    func reloadFromLocal() {
+    /// - Parameter renderEmptyState: when false, an empty cache leaves the state
+    ///   untouched (still loading) instead of claiming there are no trails —
+    ///   the pre-sync pass on a fresh install has simply not seen them yet.
+    func reloadFromLocal(renderEmptyState: Bool = true) {
         do {
             let trails = try localTrails()
             let hello = greeting()
@@ -67,6 +83,7 @@ final class TodayViewModel {
                 stageCountByTrail: try stageCounts(for: trails),
                 today: localToday()
             ) else {
+                guard renderEmptyState else { return }
                 WatchSessionBridge.shared.send(snapshot: .unavailable(
                     title: hello,
                     subtitle: "Zatím nemáš žádnou trasu."
@@ -79,6 +96,7 @@ final class TodayViewModel {
             guard let todayStage = stages.first(where: {
                 stageDate(date: $0.date, orderIndex: $0.orderIndex, trailStartDate: activeTrail.startDate) == localToday()
             }) else {
+                guard renderEmptyState else { return }
                 WatchSessionBridge.shared.send(snapshot: .unavailable(
                     title: activeTrail.name,
                     subtitle: "Na dnešek není naplánovaná žádná etapa."

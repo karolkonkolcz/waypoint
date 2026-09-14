@@ -36,11 +36,46 @@ final class AppDatabase: Sendable {
     // MARK: - Reset
 
     /// Wipe every table (trails, stages, routes, waypoints, todos, caches,
-    /// sync_metadata, sync_queue) and rebuild the empty schema. Used on sign-out
-    /// so a different account never sees the previous user's local-first cache.
+    /// sync_metadata, sync_queue) and rebuild the empty schema. Used when a
+    /// *different* account signs in, and on an explicit "sign out and erase",
+    /// so one account never sees another's local-first cache.
     func eraseAllData() async throws {
         try await dbPool.erase()
         try applyMigrations(dbPool)
+    }
+
+    // MARK: - Ownership
+
+    private static let dataOwnerKey = "dataOwnerUserId"
+
+    /// The user this cache belongs to. Deliberately outlives a plain sign-out —
+    /// signing back in with the same account keeps the trails (and any writes
+    /// still queued from the field) — and dies with `eraseAllData()`.
+    func dataOwnerUserId() throws -> String? {
+        try dbPool.read { db in
+            try String.fetchOne(
+                db,
+                sql: "SELECT value FROM sync_metadata WHERE key = ?",
+                arguments: [AppDatabase.dataOwnerKey]
+            )
+        }
+    }
+
+    func setDataOwnerUserId(_ userId: String) throws {
+        try dbPool.write { db in
+            try db.execute(
+                sql: "INSERT OR REPLACE INTO sync_metadata(key, value) VALUES (?, ?)",
+                arguments: [AppDatabase.dataOwnerKey, userId]
+            )
+        }
+    }
+
+    /// Local writes that have not reached Supabase yet. Shown before sign-out so
+    /// nobody erases the only copy of a week's worth of edits by accident.
+    func pendingSyncOpCount() throws -> Int {
+        try dbPool.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM sync_queue") ?? 0
+        }
     }
 
     // MARK: - Migrations

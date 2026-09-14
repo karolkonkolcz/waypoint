@@ -61,7 +61,9 @@ struct AccountView: View {
 
     private func loadProfile() async {
         let user = SupabaseManager.shared.client.auth.currentSession?.user
-        email = user?.email ?? ""
+        // Falls back to the locally stored identity: the SDK's session can be
+        // gone while the account this device belongs to is still known.
+        email = user?.email ?? LocalIdentityStore.shared.current?.email ?? ""
 
         guard let userId = SupabaseManager.shared.currentUserId else {
             isLoading = false

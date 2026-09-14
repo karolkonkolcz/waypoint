@@ -31,7 +31,7 @@ struct TrailDetailView: View {
             .toolbar { toolbar }
             .task { await model.load(trailId: trail.id) }
             .task { await streamWaypoints() }
-            .refreshable { await model.load(trailId: trail.id) }
+            .refreshable { await model.refresh(trailId: trail.id) }
             .sheet(isPresented: $showEditTrail) {
                 TrailEditView(trail: trail)
             }

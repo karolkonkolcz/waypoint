@@ -12,8 +12,8 @@ final class WeatherTabViewModel: NSObject, CLLocationManagerDelegate {
         case idle
         case locating
         case fetching(lat: Double, lon: Double)
-        case loaded(snapshot: WeatherSnapshot, series: MeteogramSeries, place: String?, fetchedAt: Date)
-        case offlineFallback(snapshot: WeatherSnapshot, series: MeteogramSeries, label: String)
+        case loaded(snapshot: WeatherSnapshot, series: MeteogramSeries, place: String?, fetchedAt: Date, lat: Double, lon: Double)
+        case offlineFallback(snapshot: WeatherSnapshot, series: MeteogramSeries, label: String, lat: Double, lon: Double)
         case failed(String)
     }
 
@@ -80,7 +80,7 @@ final class WeatherTabViewModel: NSObject, CLLocationManagerDelegate {
 
             // Reverse-geocode in background — never gates the chart
             let place = await reverseGeocode(lat: lat, lon: lon)
-            state = .loaded(snapshot: snapshot, series: series, place: place, fetchedAt: Date())
+            state = .loaded(snapshot: snapshot, series: series, place: place, fetchedAt: Date(), lat: lat, lon: lon)
         } catch {
             await resolveOffline(reason: "Nepodařilo se načíst počasí.")
         }
@@ -148,22 +148,22 @@ final class WeatherTabViewModel: NSObject, CLLocationManagerDelegate {
 
     private func resolveOffline(reason: String) async {
         // Try to serve most-recent stage weather from GRDB as offline fallback
-        if let (snapshot, series, label) = offlineFallback() {
-            state = .offlineFallback(snapshot: snapshot, series: series, label: label)
+        if let (snapshot, series, label, lat, lon) = offlineFallback() {
+            state = .offlineFallback(snapshot: snapshot, series: series, label: label, lat: lat, lon: lon)
         } else {
             state = .failed(reason)
         }
     }
 
-    private func offlineFallback() -> (WeatherSnapshot, MeteogramSeries, String)? {
+    private func offlineFallback() -> (WeatherSnapshot, MeteogramSeries, String, Double, Double)? {
         guard let rows = try? mostRecentWeatherRows(),
-              !rows.isEmpty else { return nil }
+              let row = rows.first else { return nil }
         let samples = decodeWeatherSamples(rows)
         guard let first = samples.first else { return nil }
         let snapshot = buildWeatherSnapshot(first.result, date: first.date)
         let series = limitedMeteogramSeries(from: first.result, date: first.date, hourLimit: 48)
         let label = "Uložená data z etapy"
-        return (snapshot, series, label)
+        return (snapshot, series, label, row.latitude, row.longitude)
     }
 
     private func mostRecentWeatherRows() throws -> [WeatherRow] {
@@ -212,7 +212,7 @@ struct WeatherTabView: View {
         case .idle, .locating, .fetching:
             loadingView
 
-        case .loaded(let snapshot, let series, let place, let fetchedAt):
+        case .loaded(let snapshot, let series, let place, let fetchedAt, let lat, let lon):
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     headerRow(snapshot: snapshot, place: place)
@@ -221,11 +221,12 @@ struct WeatherTabView: View {
                         .padding()
                         .background(.background, in: RoundedRectangle(cornerRadius: 12))
                         .overlay { RoundedRectangle(cornerRadius: 12).stroke(.quaternary) }
+                    RadarMapView(lat: lat, lon: lon)
                 }
                 .padding()
             }
 
-        case .offlineFallback(let snapshot, let series, let label):
+        case .offlineFallback(let snapshot, let series, let label, let lat, let lon):
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Label(label, systemImage: "wifi.slash")
@@ -237,6 +238,7 @@ struct WeatherTabView: View {
                         .padding()
                         .background(.background, in: RoundedRectangle(cornerRadius: 12))
                         .overlay { RoundedRectangle(cornerRadius: 12).stroke(.quaternary) }
+                    RadarMapView(lat: lat, lon: lon)
                 }
                 .padding()
             }

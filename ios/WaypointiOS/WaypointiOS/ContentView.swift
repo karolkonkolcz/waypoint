@@ -19,8 +19,8 @@ struct ContentView: View {
             ProgressView()
                 .task { await auth.bootstrap() }
 
-        case .enterEmail, .enterCode:
-            LoginView()
+        case .signedOut:
+            LoginView(mode: .initial)
                 .onChange(of: auth.step) { _, newStep in
                     if case .signedIn = newStep {
                         onboardingChecked = false

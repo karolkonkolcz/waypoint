@@ -6,14 +6,37 @@ import UIKit
 
 // Local-first sync engine. UI reads from GRDB; writes enqueue local ops; sync
 // pushes pending ops first, then pulls remote LWW changes.
+//
+// Sync is strictly best-effort: it never blocks a read, never signs anyone out,
+// and backs off when the network is unreliable rather than retrying into a flat
+// battery. A device with no connection simply has nothing to do here.
+
+extension Notification.Name {
+    /// The server told us our session no longer exists (the SDK has already
+    /// dropped it). The app stays usable; only sync pauses until the user
+    /// enters a fresh code. Observed by `AuthViewModel`.
+    static let waypointSessionLost = Notification.Name("waypoint.sessionLost")
+}
 
 @MainActor
 final class SyncEngine {
     static let shared = SyncEngine()
 
+    enum Trigger {
+        case automatic      // app launch, foreground, network came back
+        case userInitiated  // pull-to-refresh: ignore the backoff window
+    }
+
     private let db = AppDatabase.shared
     private let supabase = SupabaseManager.shared.client
     private var networkMonitor: NWPathMonitor?
+
+    /// Assume online until the monitor says otherwise, so the launch sync is not
+    /// dropped while the first path update is still in flight.
+    private(set) var isOnline = true
+    private var isSyncing = false
+    private var consecutiveFailures = 0
+    private var retryNotBefore: Date?
 
     private init() {}
 
@@ -25,17 +48,41 @@ final class SyncEngine {
     }
 
     // Exposed for pull-to-refresh from ViewModels.
-    func sync() async {
+    func sync(_ trigger: Trigger = .automatic) async {
+        guard !isSyncing else { return }
+        guard supabase.auth.currentSession != nil else {
+            // Signed out, or the server dropped our session. Local reads and
+            // writes carry on either way.
+            reportSessionHealth()
+            return
+        }
+        if trigger == .automatic {
+            guard isOnline else { return }
+            if let retryNotBefore, Date() < retryNotBefore { return }
+        }
+
+        isSyncing = true
+        defer { isSyncing = false }
+
+        var succeeded = true
         do {
             try await push()
         } catch {
             // Non-fatal: queued writes remain in GRDB for the next sync.
+            succeeded = false
         }
-        await pull()
+        let pulled = await pull()
+        if !pulled {
+            succeeded = false
+        }
+
+        noteAttempt(succeeded: succeeded)
+        reportSessionHealth()
     }
 
-    func pull() async {
-        guard let session = supabase.auth.currentSession else { return }
+    @discardableResult
+    func pull() async -> Bool {
+        guard let session = supabase.auth.currentSession else { return false }
         let userId = session.user.id.uuidString
         do {
             try await pullTrails(userId: userId)
@@ -43,9 +90,36 @@ final class SyncEngine {
             try await pullRoutes(userId: userId)
             try await pullWaypoints(userId: userId)
             try await pullTodos(userId: userId)
+            return true
         } catch {
             // Non-fatal: UI continues to render the local GRDB cache.
+            return false
         }
+    }
+
+    // MARK: - Backoff
+
+    private func noteAttempt(succeeded: Bool) {
+        if succeeded {
+            consecutiveFailures = 0
+            retryNotBefore = nil
+            return
+        }
+        consecutiveFailures = min(consecutiveFailures + 1, 6)
+        // 10s, 20s, 40s … capped at 5 minutes. One bar of reception in the
+        // mountains must not turn into a retry storm.
+        let delay = min(pow(2, Double(consecutiveFailures - 1)) * 10, 300)
+        retryNotBefore = Date().addingTimeInterval(delay)
+    }
+
+    /// The SDK erases its stored session when the server reports it is gone —
+    /// the realistic outcome of coming back online after weeks away. Surface
+    /// that as "re-verify to resume sync", never as a sign-out.
+    private func reportSessionHealth() {
+        guard supabase.auth.currentSession == nil,
+              LocalIdentityStore.shared.current != nil
+        else { return }
+        NotificationCenter.default.post(name: .waypointSessionLost, object: nil)
     }
 
     // MARK: - Push
@@ -490,9 +564,21 @@ final class SyncEngine {
     private func startNetworkMonitor() {
         let monitor = NWPathMonitor()
         networkMonitor = monitor
-        monitor.pathUpdateHandler = { [weak self] path in
-            guard path.status == .satisfied else { return }
-            Task { await self?.sync() }
+        monitor.pathUpdateHandler = { path in
+            let satisfied = path.status == .satisfied
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let wasOffline = !self.isOnline
+                self.isOnline = satisfied
+                guard satisfied else { return }
+                // Walking back into coverage is the one moment worth retrying
+                // immediately, whatever the backoff window says.
+                if wasOffline {
+                    self.consecutiveFailures = 0
+                    self.retryNotBefore = nil
+                }
+                await self.sync()
+            }
         }
         monitor.start(queue: DispatchQueue(label: "waypoint.netmonitor", qos: .background))
     }

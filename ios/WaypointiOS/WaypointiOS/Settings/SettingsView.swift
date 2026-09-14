@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @Environment(AuthViewModel.self) private var auth
     @State private var showAccount = false
+    @State private var showSignOut = false
 
     var body: some View {
         NavigationStack {
@@ -18,7 +18,7 @@ struct SettingsView: View {
 
                 Section {
                     Button(role: .destructive) {
-                        Task { await auth.signOut() }
+                        showSignOut = true
                     } label: {
                         Label("Odhlásit se", systemImage: "rectangle.portrait.and.arrow.right")
                     }
@@ -28,6 +28,7 @@ struct SettingsView: View {
             .sheet(isPresented: $showAccount) {
                 AccountView()
             }
+            .signOutConfirmation(isPresented: $showSignOut)
         }
     }
 }

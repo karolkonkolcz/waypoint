@@ -9,11 +9,11 @@ import SwiftUI
 import GRDB
 
 struct TrailListView: View {
-    @Environment(AuthViewModel.self) private var auth
     @State private var model = TrailListViewModel()
     @State private var showNewTrail = false
     @State private var showGpxImport = false
     @State private var importedTrailId: String?
+    @State private var showSignOut = false
 
     var body: some View {
         NavigationStack {
@@ -21,9 +21,7 @@ struct TrailListView: View {
                 .navigationTitle("Moje trasy")
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
-                        Button("Odhlásit") {
-                            Task { await auth.signOut() }
-                        }
+                        Button("Odhlásit") { showSignOut = true }
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
@@ -40,7 +38,8 @@ struct TrailListView: View {
                     }
                 }
                 .task { await model.load() }
-                .refreshable { await model.load() }
+                .refreshable { await model.refresh() }
+                .signOutConfirmation(isPresented: $showSignOut)
                 .sheet(isPresented: $showNewTrail) {
                     TrailEditView()
                 }

@@ -21,13 +21,22 @@ final class TrailDetailViewModel {
     private var currentTrailId: String?
 
     func load(trailId: String) async {
+        await load(trailId: trailId, trigger: .automatic)
+    }
+
+    /// Pull-to-refresh: bypasses the sync engine's backoff window.
+    func refresh(trailId: String) async {
+        await load(trailId: trailId, trigger: .userInitiated)
+    }
+
+    private func load(trailId: String, trigger: SyncEngine.Trigger) async {
         if currentTrailId != trailId {
             observationTask?.cancel()
             observationTask = nil
             currentTrailId = trailId
         }
         startObservationIfNeeded(trailId: trailId)
-        await SyncEngine.shared.sync()
+        await SyncEngine.shared.sync(trigger)
     }
 
     func deleteStage(_ stage: Stage) {
